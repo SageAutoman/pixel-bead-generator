@@ -1077,9 +1077,9 @@
       <div class="sb-section">
         <div class="sb-title"><span>🎨 色卡库</span><span id="palette-count" style="color:var(--c-text-3);font-weight:500">0色</span></div>
         <select class="brand-select" id="brand-select">
-          <option value="MARD">MARD（默认 · 291色）</option>
-          <option value="Hama">Hama Midi（Sprint 2）</option>
-          <option value="Perler">Perler（Sprint 2）</option>
+          <option value="MARD">MARD（默认 · 291色 · 国内 2.6mm 迷你豆）</option>
+          <option value="Hama">Hama Midi（即将上线，等官方色卡接入）</option>
+          <option value="Perler">Perler（即将上线，等官方色卡接入）</option>
         </select>
       </div>
       <div class="palette-scroll" id="palette"></div>
@@ -1363,6 +1363,48 @@ document.getElementById('btn-go-export').addEventListener('click', () => switchV
 
 /* ============== Landing Actions ============== */
 let landingSize = 29;
+
+/* Lightweight transient toast (top-center, auto-dismiss). */
+function showToast(msg, kind) {
+  let el = document.getElementById('px-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'px-toast';
+    Object.assign(el.style, {
+      position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)',
+      padding: '10px 18px', borderRadius: '10px', fontSize: '13px', fontWeight: '600',
+      background: 'rgba(31,41,55,0.94)', color: '#fff', zIndex: '9999',
+      boxShadow: '0 8px 30px rgba(0,0,0,0.18)', pointerEvents: 'none',
+      opacity: '0', transition: 'opacity .2s ease, top .2s ease',
+      maxWidth: '92vw', textAlign: 'center'
+    });
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  if (kind === 'warn') el.style.background = '#b45309';
+  else if (kind === 'error') el.style.background = '#b91c1c';
+  else el.style.background = 'rgba(31,41,55,0.94)';
+  requestAnimationFrame(() => { el.style.opacity = '1'; el.style.top = '32px'; });
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; el.style.top = '24px'; }, 2400);
+}
+
+/* Brand / palette switcher. Currently only MARD is implemented; Hama/Perler are
+   placeholders until we ingest authoritative color data. */
+const brandSel = document.getElementById('brand-select');
+if (brandSel) {
+  brandSel.addEventListener('change', (e) => {
+    const v = e.target.value;
+    if (v === 'MARD') {
+      document.getElementById('m-brand').textContent = 'MARD';
+      return;
+    }
+    showToast(`${v === 'Hama' ? 'Hama Midi' : 'Perler'} 色板还没接入官方色号数据，避免给你错的购物清单，先按住不发车 🛑`, 'warn');
+    e.target.value = 'MARD';
+    document.getElementById('m-brand').textContent = 'MARD';
+  });
+}
+
 document.querySelectorAll('.size-btn').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.size-btn').forEach(x => x.classList.remove('active'));
   b.classList.add('active');
