@@ -1,0 +1,2613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PixelBead 拼豆图纸工坊</title>
+<style>
+  :root {
+    --c-primary: #ff8fab;
+    --c-secondary: #fb6f92;
+    --c-accent: #a2d2ff;
+    --c-paper: #ffffff;
+    --c-bg: #fafafa;
+    --c-border: rgba(0,0,0,0.08);
+    --c-text: #1f2937;
+    --c-text-2: #6b7280;
+    --c-text-3: #9ca3af;
+    --c-toolbar-bg: #f3f4f6;
+    --c-active-bg: #fff0f3;
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --c-paper: #1a1c24;
+      --c-bg: #111318;
+      --c-border: rgba(255,255,255,0.08);
+      --c-text: #e5e7eb;
+      --c-text-2: #9ca3af;
+      --c-text-3: #6b7280;
+      --c-toolbar-bg: #1f2128;
+      --c-active-bg: #3a1f29;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: 'Sora', 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--c-bg);
+    color: var(--c-text);
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* Header */
+  header {
+    background: var(--c-paper);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--c-border);
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+  .logo {
+    font-weight: 800;
+    font-size: 17px;
+    color: var(--c-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .logo .badge {
+    background: var(--c-primary);
+    color: white;
+    padding: 2px 8px;
+    border-radius: var(--r-sm);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--c-toolbar-bg);
+    padding: 3px;
+    border-radius: var(--r-md);
+    margin-left: auto;
+  }
+  .tab {
+    padding: 6px 14px;
+    border: none;
+    background: transparent;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--c-text-2);
+    font-size: 13px;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .tab.active {
+    background: var(--c-paper);
+    color: var(--c-secondary);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .btn-primary {
+    background: var(--c-secondary);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 100px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+    transition: transform 0.1s;
+  }
+  .btn-primary:active { transform: scale(0.96); }
+
+  /* Views */
+  .view { display: none; flex: 1; min-height: 0; }
+  .view.active { display: flex; }
+
+  /* Landing */
+  #v-landing {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: linear-gradient(135deg, #ffe5ec 0%, #ffc2d1 100%);
+    overflow-y: auto;
+  }
+  @media (prefers-color-scheme: dark) {
+    #v-landing { background: linear-gradient(135deg, #2a1622 0%, #3a1929 100%); }
+  }
+  .landing-card {
+    background: var(--c-paper);
+    padding: 32px 28px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.08);
+    width: 100%;
+    max-width: 380px;
+  }
+  .landing-card h2 { margin: 0 0 6px; font-size: 22px; }
+  .landing-card .sub { color: var(--c-text-2); margin: 0 0 20px; font-size: 13px; line-height: 1.5; }
+  .upload-area {
+    display: block;
+    border: 2px dashed var(--c-primary);
+    border-radius: var(--r-lg);
+    padding: 28px 16px;
+    margin-bottom: 16px;
+    background: rgba(255, 143, 171, 0.06);
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .upload-area.drag-over { background: rgba(255, 143, 171, 0.18); border-color: var(--c-secondary); }
+  .upload-area:hover { background: rgba(255, 143, 171, 0.12); }
+  .upload-icon { font-size: 36px; margin-bottom: 8px; }
+  .upload-area .ttl { font-weight: 700; color: var(--c-secondary); font-size: 14px; }
+  .upload-area .hint { font-size: 11px; color: var(--c-text-3); margin-top: 4px; }
+  .size-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .size-btn {
+    flex: 1; padding: 10px 6px; border: 1px solid var(--c-border);
+    background: var(--c-paper); border-radius: var(--r-md);
+    cursor: pointer; font-family: inherit; font-size: 12px;
+    color: var(--c-text); transition: 0.15s;
+  }
+  .size-btn.active { border-color: var(--c-secondary); background: var(--c-active-bg); color: var(--c-secondary); font-weight: 700; }
+  .size-btn .n { font-weight: 800; font-size: 14px; display: block; line-height: 1.2; }
+  .size-btn .lbl { display: block; color: var(--c-text-3); font-size: 10px; margin-top: 2px; }
+  .start-btn {
+    width: 100%; padding: 12px; background: var(--c-accent);
+    color: white; border: none; border-radius: 100px;
+    font-weight: 800; font-size: 14px; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(162, 210, 255, 0.4);
+    font-family: inherit; transition: transform 0.1s;
+  }
+  .start-btn:active { transform: scale(0.97); }
+
+  /* Editor */
+  #v-editor { flex-direction: row; background: var(--c-bg); }
+  .toolbar {
+    width: 56px;
+    background: var(--c-paper);
+    border-right: 1px solid var(--c-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .tool {
+    width: 40px; height: 40px;
+    border-radius: var(--r-md);
+    background: transparent;
+    border: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    transition: 0.15s;
+    color: var(--c-text);
+    font-family: inherit;
+  }
+  .tool:hover { background: var(--c-toolbar-bg); }
+  .tool.active { background: var(--c-active-bg); border-color: var(--c-primary); }
+  .tool-spacer { flex: 1; }
+  .tool-divider { width: 32px; height: 1px; background: var(--c-border); margin: 4px 0; }
+
+  .canvas-area {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-image: radial-gradient(rgba(0,0,0,0.06) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+  .action-bar {
+    background: var(--c-paper);
+    border-bottom: 1px solid var(--c-border);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+  .action-bar .grp { display: flex; gap: 4px; }
+  .action-bar .sep { width: 1px; height: 20px; background: var(--c-border); }
+  .ab-btn {
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--c-text);
+    font-family: inherit;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .ab-btn:hover:not(:disabled) { background: var(--c-toolbar-bg); }
+  .ab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ab-meta {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--c-text-3);
+    display: flex;
+    gap: 12px;
+    white-space: nowrap;
+  }
+  .ab-meta .v { color: var(--c-text); font-weight: 600; }
+
+  .canvas-wrap {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #canvas {
+    position: absolute;
+    image-rendering: pixelated;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+    background: white;
+    border-radius: 4px;
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .zoom-readout {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: var(--c-paper);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--c-text-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .hover-hint {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: var(--c-paper);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--c-text-2);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    display: none;
+  }
+
+  .sidebar {
+    width: 280px;
+    background: var(--c-paper);
+    border-left: 1px solid var(--c-border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .sb-section { padding: 14px; border-bottom: 1px solid var(--c-border); }
+  .bead-style-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .bs-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--c-accent);
+    background: white;
+    color: var(--c-text);
+    border-radius: 100px;
+    cursor: pointer;
+    transition: all 0.2s ease-out;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .bs-btn span { font-size: 12px; color: inherit; font-weight: inherit; }
+  .bs-btn:hover { background: #f8f9fa; }
+  .bs-btn.active {
+    background: var(--c-accent);
+    color: white;
+    border-color: var(--c-accent);
+    box-shadow: 0 2px 6px rgba(162, 210, 255, 0.4);
+  }
+  .bs-btn.active span { color: white; }
+
+  /* Outline popover (designer spec) */
+  .outline-pop {
+    position: fixed;
+    background: white;
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border: 1px solid #e9ecef;
+    z-index: 70;
+    width: 240px;
+    display: none;
+  }
+  .outline-pop.open { display: block; }
+  .outline-pop h4 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #adb5bd;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .outline-pop .row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+  .outline-pop .swatch {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px var(--c-border);
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .outline-pop .swatch:hover { transform: scale(1.08); }
+  .outline-pop .swatch.active { box-shadow: 0 0 0 2px var(--c-secondary); }
+  .outline-pop .swatch.custom { background: conic-gradient(red, orange, yellow, lime, cyan, blue, magenta, red); }
+  .outline-pop input[type="color"] {
+    width: 100%; height: 36px;
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  .outline-pop .neighborhood {
+    display: flex; gap: 6px; margin-bottom: 12px;
+  }
+  .outline-pop .nb-btn {
+    flex: 1;
+    padding: 6px 8px;
+    background: white;
+    border: 1px solid var(--c-border);
+    border-radius: 100px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--c-text-2);
+    transition: 0.15s;
+  }
+  .outline-pop .nb-btn.active {
+    background: var(--c-accent);
+    border-color: var(--c-accent);
+    color: white;
+  }
+  .outline-pop .apply-btn {
+    width: 100%;
+    padding: 9px;
+    background: var(--c-secondary);
+    color: white;
+    border: none;
+    border-radius: 100px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .outline-pop .apply-btn:active { transform: scale(0.98); }
+  .outline-pop .hint {
+    font-size: 10px; color: var(--c-text-3);
+    margin-top: 8px; text-align: center;
+  }
+  .sb-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--c-text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .brand-select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    background: var(--c-paper);
+    color: var(--c-text);
+    font-family: inherit;
+    font-size: 12px;
+  }
+  .palette-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 14px 14px;
+  }
+  .family-block { margin-top: 10px; }
+  .family-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 6px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--c-text);
+  }
+  .family-head .l { display: flex; align-items: center; gap: 8px; }
+  .family-head .swatch {
+    width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid var(--c-border);
+  }
+  .family-head .count { color: var(--c-text-3); font-weight: 500; font-size: 11px; }
+  .family-head .fh-right { display: flex; gap: 8px; align-items: center; }
+  .family-head .caret {
+    width: 12px; height: 12px;
+    border-right: 1.5px solid var(--c-text-3);
+    border-bottom: 1.5px solid var(--c-text-3);
+    transform: rotate(-45deg);
+    transition: transform 0.2s;
+  }
+  .family-block.open .family-head .caret { transform: rotate(45deg); }
+  .family-grid {
+    display: none;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    padding-top: 6px;
+  }
+  .family-block.open .family-grid { display: grid; }
+  .color-dot {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--c-paper);
+    box-shadow: 0 0 0 1px var(--c-border);
+    transition: transform 0.1s;
+  }
+  .color-dot:hover { transform: scale(1.15); }
+  .color-dot.active { box-shadow: 0 0 0 2px var(--c-secondary); transform: scale(1.1); }
+  .color-dot.special { background-image: linear-gradient(135deg, var(--c) 0%, var(--c) 50%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0.55) 60%, var(--c) 60%) !important; }
+  .family-block[data-family="special"] .family-head .l::after { content: '✨'; font-size: 11px; }
+
+  .materials {
+    padding: 12px 14px;
+    border-top: 1px solid var(--c-border);
+    background: var(--c-paper);
+    flex-shrink: 0;
+    max-height: 30vh;
+    overflow-y: auto;
+  }
+  .material-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-radius: var(--r-sm);
+    background: var(--c-toolbar-bg);
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .material-item .l { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .material-item .mini-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 1px solid var(--c-border); flex-shrink: 0;
+  }
+  .material-item .lbl { font-weight: 600; }
+  .material-item .qty { font-weight: 700; color: var(--c-secondary); font-variant-numeric: tabular-nums; }
+  .empty-hint { font-size: 12px; color: var(--c-text-3); text-align: center; padding: 16px 0; }
+
+  /* Export */
+  #v-export { background: #e5e7eb; padding: 24px; overflow: auto; flex-direction: column; align-items: center; }
+  @media (prefers-color-scheme: dark) {
+    #v-export { background: #0a0c10; }
+  }
+  .a4 {
+    width: 100%;
+    max-width: 700px;
+    background: white;
+    color: #1f2937;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+    padding: 36px;
+    border-radius: 4px;
+    margin-bottom: 24px;
+  }
+  .a4 .head {
+    border-bottom: 2px solid #1f2937;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .a4 h1 { margin: 0 0 4px; font-size: 22px; color: #1f2937; }
+  .a4 .meta { color: #6b7280; font-size: 12px; }
+  .a4 .pattern-wrap { text-align: center; margin-bottom: 24px; }
+  .a4 #export-canvas {
+    max-width: 100%;
+    image-rendering: pixelated;
+    border: 1px solid #d1d5db;
+    background: white;
+  }
+  .a4 h3 { font-size: 14px; margin: 16px 0 8px; padding-left: 8px; border-left: 4px solid var(--c-secondary); color: #1f2937; }
+  .a4 table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .a4 th, .a4 td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; color: #1f2937; }
+  .a4 th { background: #f3f4f6; font-weight: 700; }
+  .a4 .qty-cell { text-align: right; font-weight: 700; }
+  .a4 .swatch-cell { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #d1d5db; display: inline-block; vertical-align: middle; }
+  .total-row { font-weight: 800; background: #fafafa; }
+
+  /* Compact 3-column legend (replaces bulky color table) */
+  .export-legend {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px 14px;
+    font-size: 11.5px;
+    color: #1f2937;
+    padding: 6px 0;
+  }
+  .export-legend .leg-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 3px 4px;
+    border-bottom: 1px dotted #e5e7eb;
+  }
+  .export-legend .leg-num {
+    flex: 0 0 22px; height: 22px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 4px; border: 1px solid rgba(0,0,0,0.08);
+    font-weight: 700; font-size: 11px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .export-legend .leg-id { flex: 1; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: #374151; }
+  .export-legend .leg-qty { color: #1f2937; font-weight: 700; min-width: 36px; text-align: right; }
+  .export-legend .leg-empty { grid-column: 1 / -1; text-align: center; color: #9ca3af; padding: 24px; }
+  .a4 .print-tip { font-size: 11px; color: #6b7280; padding: 8px 0 0; font-style: italic; }
+
+  /* Print: only the A4 export view, single-page friendly, compact legend */
+  @media print {
+    @page { size: A4; margin: 10mm; }
+    html, body {
+      background: white !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .top-bar, .toolbar, .sidebar, .tabs, .modal-backdrop, .drawer-backdrop,
+    .outline-pop, .upload-area, .landing, #upload-input, .toolbar-mobile,
+    .no-print, .ant-message, .resize-handle { display: none !important; }
+    .view { display: none !important; }
+    #v-export.view, #v-export { display: block !important; position: static !important; padding: 0 !important; background: white !important; }
+    .a4 {
+      box-shadow: none !important;
+      max-width: 100% !important;
+      width: 100% !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+    }
+    .a4 #export-canvas {
+      max-width: 100% !important;
+      max-height: 60vh;
+      border: 1px solid #1f2937 !important;
+    }
+    .export-legend {
+      grid-template-columns: repeat(4, 1fr);
+      font-size: 10px;
+      gap: 2px 10px;
+      page-break-inside: auto;
+    }
+    .export-legend .leg-item { page-break-inside: avoid; }
+    .a4 h1 { font-size: 18px !important; }
+    .a4 h3 { font-size: 13px !important; margin: 10px 0 6px !important; }
+  }
+
+  /* Compare Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--c-paper);
+    border-radius: 20px;
+    width: 100%;
+    max-width: 760px;
+    max-height: 92vh;
+    overflow: auto;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+  }
+  .modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px 6px;
+  }
+  .modal-head h3 { margin: 0; font-size: 18px; }
+  .modal-close {
+    background: transparent; border: none; cursor: pointer;
+    font-size: 22px; color: var(--c-text-2); line-height: 1;
+    padding: 4px 8px; border-radius: var(--r-sm);
+  }
+  .modal-close:hover { background: var(--c-toolbar-bg); }
+  .modal-body { padding: 8px 24px 24px; }
+  .modal-sub { text-align: center; color: var(--c-text-2); font-size: 13px; margin: 4px 0 18px; }
+  .suggestion {
+    background: linear-gradient(135deg, rgba(162, 210, 255, 0.22), rgba(255, 143, 171, 0.16));
+    border: 1px solid var(--c-accent);
+    border-radius: var(--r-md);
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--c-text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    line-height: 1.5;
+  }
+  .suggestion .ico { font-size: 18px; }
+  .suggestion-btn {
+    margin-left: auto;
+    padding: 4px 12px;
+    background: var(--c-secondary); color: white;
+    border: none; border-radius: 100px;
+    font-size: 11px; font-weight: 700; cursor: pointer;
+    font-family: inherit;
+  }
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .bg-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: var(--c-toolbar-bg);
+    border-radius: var(--r-md);
+    flex-wrap: wrap;
+  }
+  .bg-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c-text);
+  }
+  .bg-toggle-label input { display: none; }
+  .bg-toggle-track {
+    width: 36px; height: 20px;
+    background: #d0d4d9;
+    border-radius: 100px;
+    position: relative;
+    transition: background 0.2s;
+  }
+  .bg-toggle-knob {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    transition: transform 0.2s;
+  }
+  .bg-toggle-label input:checked ~ .bg-toggle-track {
+    background: var(--c-secondary);
+  }
+  .bg-toggle-label input:checked ~ .bg-toggle-track .bg-toggle-knob {
+    transform: translateX(16px);
+  }
+  .bg-toggle-hint {
+    font-size: 11px;
+    color: var(--c-text-3);
+  }
+  .compare-card {
+    border: 2px solid var(--c-border);
+    border-radius: 16px;
+    padding: 20px;
+    transition: 0.18s;
+    cursor: pointer;
+    background: var(--c-paper);
+  }
+  .compare-card:hover {
+    border-color: var(--c-primary);
+    background: var(--c-active-bg);
+    transform: translateY(-2px);
+  }
+  .compare-card .compare-canvas {
+    width: 100%; height: auto; aspect-ratio: 1;
+    image-rendering: pixelated;
+    background: #f8f9fa;
+    border: 1px dashed var(--c-border);
+    border-radius: 10px;
+    margin-bottom: 14px;
+  }
+  .compare-card h4 {
+    margin: 0 0 10px;
+    font-size: 16px;
+    text-align: center;
+  }
+  .compare-card .bullets {
+    font-size: 13px;
+    color: var(--c-text-2);
+    line-height: 1.7;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  .compare-card .bullets div { white-space: nowrap; }
+  .compare-card .stat {
+    text-align: center;
+    color: var(--c-secondary);
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+  .compare-pick {
+    width: 100%;
+    padding: 10px;
+    background: var(--c-secondary); color: white;
+    border: none; border-radius: 100px;
+    font-weight: 700; font-size: 13px; cursor: pointer;
+    font-family: inherit;
+    transition: transform 0.1s;
+  }
+  .compare-pick:active { transform: scale(0.97); }
+  .compare-loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--c-text-2);
+    font-size: 13px;
+  }
+  .compare-loading .spin {
+    width: 32px; height: 32px;
+    border: 3px solid var(--c-border);
+    border-top-color: var(--c-secondary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+  .modal-footer {
+    text-align: center;
+    margin-top: 20px;
+  }
+  .modal-cancel {
+    background: transparent;
+    border: none;
+    color: var(--c-text-3);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 8px 16px;
+    font-family: inherit;
+  }
+  .modal-cancel:hover { color: var(--c-text); }
+  /* Mobile-only elements (default hidden) */
+  .mobile-only { display: none; }
+  .sidebar-handle, .sidebar-tabs, .drawer-backdrop { display: none; }
+  .drawer-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 55;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .drawer-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 768px) {
+    .compare-grid { grid-template-columns: 1fr; }
+    .modal { border-radius: 16px; }
+    .modal-head { padding: 14px 18px 4px; }
+    .modal-body { padding: 6px 18px 18px; }
+  }
+  @media (max-width: 768px) {
+    .mobile-only { display: flex; }
+    .desktop-only { display: none !important; }
+    header { padding: 8px 12px; gap: 6px; }
+    .logo { font-size: 14px; }
+    .logo .badge { display: none; }
+    .tab { padding: 5px 10px; font-size: 12px; }
+    .btn-primary { padding: 6px 12px; font-size: 12px; }
+
+    #v-editor { flex-direction: column; position: relative; }
+
+    /* Toolbar → bottom-fixed floating bar */
+    .toolbar {
+      position: fixed;
+      left: 0; right: 0;
+      bottom: 0;
+      width: 100%;
+      height: auto;
+      flex-direction: row;
+      padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+      border-right: none;
+      border-top: 1px solid var(--c-border);
+      background: var(--c-paper);
+      box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+      overflow-x: auto;
+      z-index: 50;
+      gap: 4px;
+      justify-content: space-around;
+    }
+    .tool { width: 44px; height: 44px; font-size: 18px; flex-shrink: 0; }
+    .tool-spacer { display: none; }
+    .tool-divider { width: 1px; height: 24px; margin: 0 4px; }
+
+    /* Action bar: compact */
+    .action-bar { padding: 6px 8px; gap: 4px; }
+    .action-bar .ab-meta { display: none; }
+    .ab-btn { font-size: 11px; padding: 5px 8px; }
+
+    /* Canvas area: full screen above floating toolbar */
+    .canvas-area { flex: 1; padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
+    .canvas-wrap { touch-action: none; }
+    .zoom-readout, .hover-hint { z-index: 30; }
+
+    /* Sidebar → bottom drawer */
+    .sidebar {
+      position: fixed;
+      left: 0; right: 0;
+      bottom: 0;
+      width: 100%;
+      max-height: 75vh;
+      height: 75vh;
+      border-left: none;
+      border-top: none;
+      border-radius: 24px 24px 0 0;
+      z-index: 60;
+      transform: translateY(100%);
+      transition: transform 0.3s ease-out;
+      box-shadow: 0 -8px 32px rgba(0,0,0,0.18);
+      flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .sidebar.open { transform: translateY(0); }
+
+    /* Drawer chrome */
+    .sidebar-handle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 16px 8px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .sidebar-handle::before {
+      content: '';
+      position: absolute;
+      top: 8px; left: 50%;
+      transform: translateX(-50%);
+      width: 40px; height: 4px;
+      background: #dee2e6;
+      border-radius: 2px;
+    }
+    .sidebar-handle .title { font-size: 14px; font-weight: 700; }
+    .sidebar-handle .close-btn {
+      background: transparent;
+      border: none;
+      font-size: 20px;
+      color: var(--c-text-2);
+      padding: 4px 12px;
+      cursor: pointer;
+      font-family: inherit;
+      line-height: 1;
+    }
+    .sidebar-tabs {
+      display: flex;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--c-border);
+      flex-shrink: 0;
+    }
+    .sidebar-tab {
+      flex: 1;
+      padding: 10px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--c-text-2);
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: -1px;
+    }
+    .sidebar-tab.active {
+      color: var(--c-secondary);
+      border-bottom-color: var(--c-secondary);
+    }
+
+    /* Tab content visibility */
+    .sidebar .sb-section { padding: 12px 14px; }
+    .sidebar.tab-color .materials { display: none; }
+    .sidebar.tab-color .palette-scroll { flex: 1; max-height: none; padding-bottom: 24px; }
+    .sidebar.tab-mat .sb-section { display: none; }
+    .sidebar.tab-mat .palette-scroll { display: none; }
+    .sidebar.tab-mat .materials { flex: 1; max-height: none; display: block; padding-bottom: 24px; }
+
+    .family-grid { grid-template-columns: repeat(8, 1fr); }
+    .color-dot { min-width: 28px; min-height: 28px; }
+
+    .drawer-backdrop { display: block; }
+
+    #v-export { padding: 12px; }
+    .a4 { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">✨ PixelBead<span class="badge">图纸工坊</span></div>
+    <div class="tabs">
+      <button class="tab active" data-view="landing">1. 上传</button>
+      <button class="tab" data-view="editor">2. 工作区</button>
+      <button class="tab" data-view="export">3. 打印</button>
+    </div>
+    <button class="btn-primary" id="btn-go-export">导出图纸</button>
+  </header>
+
+  <!-- Landing -->
+  <section id="v-landing" class="view active">
+    <div class="landing-card">
+      <h2>一键生成拼豆图纸</h2>
+      <p class="sub">上传任意照片/插画，自动像素化并匹配 MARD 实体色卡</p>
+      <div class="upload-area" id="upload-area">
+        <div class="upload-icon">🖼️</div>
+        <div class="ttl">点击或拖拽上传图片</div>
+        <div class="hint">支持 JPG / PNG · 内置最近邻色彩匹配</div>
+        <input type="file" id="upload-input" accept="image/*" hidden />
+      </div>
+      <div class="size-row">
+        <button class="size-btn" data-size="16"><span class="n">16²</span><span class="lbl">~4cm</span></button>
+        <button class="size-btn active" data-size="29"><span class="n">29²</span><span class="lbl">~7.5cm</span></button>
+        <button class="size-btn" data-size="50"><span class="n">50²</span><span class="lbl">~13cm</span></button>
+        <button class="size-btn" data-size="58"><span class="n">58²</span><span class="lbl">~15cm</span></button>
+      </div>
+      <button class="start-btn" id="btn-blank">🎨 创建空白画布</button>
+    </div>
+  </section>
+
+  <!-- Editor -->
+  <section id="v-editor" class="view">
+    <div class="toolbar" id="toolbar">
+      <button class="tool active" data-tool="brush" title="画笔 B">✏️</button>
+      <button class="tool" data-tool="eraser" title="橡皮 E">🧽</button>
+      <button class="tool" data-tool="fill" title="油漆桶 G">🪣</button>
+      <button class="tool" data-tool="picker" title="取色器 I">💧</button>
+      <div class="tool-divider"></div>
+      <button class="tool" data-tool="pan" title="平移 H (空格)">🖐️</button>
+      <button class="tool" data-act="zoom-in" title="放大">🔍+</button>
+      <button class="tool" data-act="zoom-out" title="缩小">🔍-</button>
+      <button class="tool" data-act="fit" title="适配窗口">⛶</button>
+      <div class="tool-divider"></div>
+      <button class="tool" data-act="outline" title="一键描边">🖼️</button>
+      <div class="tool-spacer"></div>
+    </div>
+
+    <div class="canvas-area">
+      <div class="action-bar">
+        <div class="grp">
+          <button class="ab-btn" id="btn-new">📄 新建</button>
+          <button class="ab-btn" id="btn-reupload">📤 重新上传</button>
+        </div>
+        <div class="sep"></div>
+        <div class="grp">
+          <button class="ab-btn" id="btn-undo" disabled>↶ 撤销</button>
+          <button class="ab-btn" id="btn-redo" disabled>↷ 重做</button>
+        </div>
+        <div class="sep"></div>
+        <div class="grp">
+          <button class="ab-btn" id="btn-clear">🗑 清空</button>
+        </div>
+        <button class="ab-btn mobile-only" id="btn-show-panel" style="margin-left:auto">🎨 调色板</button>
+        <div class="ab-meta">
+          <span>尺寸 <span class="v" id="m-size">29×29</span></span>
+          <span>色板 <span class="v" id="m-brand">MARD</span></span>
+        </div>
+      </div>
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="canvas"></canvas>
+        <div class="zoom-readout" id="zoom-readout">100%</div>
+        <div class="hover-hint" id="hover-hint"></div>
+      </div>
+    </div>
+
+    <aside class="sidebar">
+      <div class="sidebar-handle">
+        <span class="title" id="drawer-title">🎨 色卡库</span>
+        <button class="close-btn" id="drawer-close">✕</button>
+      </div>
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab active" data-tab="color">🎨 色卡</button>
+        <button class="sidebar-tab" data-tab="mat">📦 用料</button>
+      </div>
+      <div class="sb-section">
+        <div class="sb-title"><span>📐 画板大小</span><span id="size-source-hint" style="color:var(--c-text-3);font-weight:500;font-size:10px"></span></div>
+        <div class="size-row" id="editor-size-row">
+          <button class="size-btn" data-size="16"><span class="n">16²</span><span class="lbl">~4cm</span></button>
+          <button class="size-btn active" data-size="29"><span class="n">29²</span><span class="lbl">~7.5cm</span></button>
+          <button class="size-btn" data-size="50"><span class="n">50²</span><span class="lbl">~13cm</span></button>
+          <button class="size-btn" data-size="58"><span class="n">58²</span><span class="lbl">~15cm</span></button>
+        </div>
+      </div>
+      <div class="sb-section">
+        <div class="sb-title"><span>✨ 显示样式</span><span style="color:var(--c-text-3);font-weight:500;font-size:10px">未烫 · 已烫</span></div>
+        <div class="bead-style-row" id="bead-style-row">
+          <button class="bs-btn active" data-style="solid" title="普通圆豆（未熨烫）">🟢<span>普通</span></button>
+          <button class="bs-btn" data-style="hollow" title="空心豆（未熨烫）">⭕<span>空心</span></button>
+          <button class="bs-btn" data-style="fluffy" title="毛巾烫 · 已熨烫融合，哑光">🌫️<span>毛巾烫</span></button>
+          <button class="bs-btn" data-style="fineGlitter" title="细闪 · 已熨烫融合">✨<span>细闪</span></button>
+          <button class="bs-btn" data-style="coarseGlitter" title="粗闪 · 已熨烫融合">💫<span>粗闪</span></button>
+        </div>
+      </div>
+      <div class="sb-section">
+        <div class="sb-title"><span>🎨 色卡库</span><span id="palette-count" style="color:var(--c-text-3);font-weight:500">0色</span></div>
+        <select class="brand-select" id="brand-select">
+          <option value="MARD">MARD（默认 · 291色）</option>
+          <option value="Hama">Hama Midi（Sprint 2）</option>
+          <option value="Perler">Perler（Sprint 2）</option>
+        </select>
+      </div>
+      <div class="palette-scroll" id="palette"></div>
+      <div class="materials">
+        <div class="sb-title">
+          <span>📦 用料清单</span>
+          <span style="color:var(--c-secondary);font-weight:700" id="total-beads">0 颗</span>
+        </div>
+        <div id="material-list"></div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- Export -->
+  <section id="v-export" class="view">
+    <div class="a4">
+      <div class="head">
+        <div>
+          <h1>拼豆图纸</h1>
+          <div class="meta">PixelBead · MARD 色板 · <span id="export-date"></span></div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:700" id="export-size">尺寸 29×29</div>
+          <div class="meta">建议 <span id="bead-size-label">2.6mm 迷你豆</span></div>
+        </div>
+      </div>
+      <div class="pattern-wrap">
+        <canvas id="export-canvas"></canvas>
+      </div>
+      <h3>颜色对照表 <span id="export-total" style="color:#6b7280;font-weight:500;font-size:13px;margin-left:8px"></span></h3>
+      <div id="export-legend" class="export-legend"></div>
+      <div class="print-tip">每格内数字对应下表编号；行/列号沿画板上方与左侧。</div>
+      <div style="margin-top:16px;text-align:center" class="no-print">
+        <button class="btn-primary" onclick="window.print()">🖨️ 打印 / 另存为 PDF</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="drawer-backdrop" id="drawer-backdrop"></div>
+
+<!-- Outline Popover -->
+<div class="outline-pop" id="outline-pop">
+  <h4>🖼️ 一键描边</h4>
+  <div class="row">
+    <div class="swatch active" data-color="#1a1a1a" style="background:#1a1a1a" title="黑"></div>
+    <div class="swatch" data-color="#fafafa" style="background:#fafafa" title="白"></div>
+    <div class="swatch custom" data-color="custom" title="自定义"></div>
+  </div>
+  <input type="color" id="outline-custom" value="#ff8fab" hidden />
+  <div class="neighborhood">
+    <button class="nb-btn active" data-nb="4">4 邻 · 细线</button>
+    <button class="nb-btn" data-nb="8">8 邻 · 粗线</button>
+  </div>
+  <button class="apply-btn" id="outline-apply">应用描边</button>
+  <div class="hint">不满意可 Ctrl+Z 撤回</div>
+</div>
+
+<!-- Compare Modal -->
+<div class="modal-backdrop" id="compare-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>AI 生成完毕！请选择风格</h3>
+      <button class="modal-close" id="compare-close" title="关闭">×</button>
+    </div>
+    <div class="modal-body" id="compare-body">
+      <div class="modal-sub">已为你生成两种拼豆图纸方案，挑一个继续编辑</div>
+      <div class="compare-loading" id="compare-loading">
+        <div class="spin"></div>
+        正在生成两种风格...
+      </div>
+      <div id="compare-content" hidden>
+        <div class="suggestion" id="size-suggestion" hidden>
+          <span class="ico">💡</span>
+          <span id="suggestion-text"></span>
+          <button class="suggestion-btn" id="suggestion-apply">使用 <span id="suggestion-size"></span>×<span id="suggestion-size-2"></span></button>
+        </div>
+        <div class="bg-toggle">
+          <label class="bg-toggle-label">
+            <input type="checkbox" id="bg-remove-toggle" checked />
+            <span class="bg-toggle-track"><span class="bg-toggle-knob"></span></span>
+            <span class="bg-toggle-text">✂️ 自动摘除背景</span>
+          </label>
+          <span class="bg-toggle-hint">主体清晰的照片效果最好；如有残留可关闭</span>
+        </div>
+        <div class="compare-grid">
+          <div class="compare-card" data-mode="cute">
+            <canvas class="compare-canvas" id="canvas-cute"></canvas>
+            <h4>🧸 Q 版方案</h4>
+            <div class="bullets">
+              <div>✅ 色块简化，轮廓更圆润</div>
+              <div>✅ 适合新手，颜色种类较少</div>
+            </div>
+            <div class="stat" id="stats-cute"></div>
+            <button class="compare-pick" data-mode="cute">选这个</button>
+          </div>
+          <div class="compare-card" data-mode="realistic">
+            <canvas class="compare-canvas" id="canvas-realistic"></canvas>
+            <h4>🖼️ 写实方案</h4>
+            <div class="bullets">
+              <div>✅ 保留光影细节和层次感</div>
+              <div>✅ 适合高阶玩家，颜色丰富</div>
+            </div>
+            <div class="stat" id="stats-realistic"></div>
+            <button class="compare-pick" data-mode="realistic">选这个</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-cancel" id="compare-cancel">取消，重新上传</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============== Color Data (MARD) ============== */
+const MARD_RAW = [{"id":"MARD-A1","hex":"#FAF4C8","family":"yellow"},{"id":"MARD-A10","hex":"#F77C31","family":"yellow"},{"id":"MARD-A11","hex":"#FFDD99","family":"yellow"},{"id":"MARD-A12","hex":"#FE9F72","family":"yellow"},{"id":"MARD-A13","hex":"#FFC365","family":"yellow"},{"id":"MARD-A14","hex":"#FD543D","family":"yellow"},{"id":"MARD-A15","hex":"#FFF365","family":"yellow"},{"id":"MARD-A16","hex":"#FFFF9F","family":"yellow"},{"id":"MARD-A17","hex":"#FFE36E","family":"yellow"},{"id":"MARD-A18","hex":"#FEBE7D","family":"yellow"},{"id":"MARD-A19","hex":"#FD7C72","family":"yellow"},{"id":"MARD-A2","hex":"#FFFFD5","family":"yellow"},{"id":"MARD-A20","hex":"#FFD568","family":"yellow"},{"id":"MARD-A21","hex":"#FFE395","family":"yellow"},{"id":"MARD-A22","hex":"#F4F57D","family":"yellow"},{"id":"MARD-A23","hex":"#E6C9B7","family":"yellow"},{"id":"MARD-A24","hex":"#F7F8A2","family":"yellow"},{"id":"MARD-A25","hex":"#FFD67D","family":"yellow"},{"id":"MARD-A26","hex":"#FFC830","family":"yellow"},{"id":"MARD-A3","hex":"#FEFF8B","family":"yellow"},{"id":"MARD-A4","hex":"#FBED56","family":"yellow"},{"id":"MARD-A5","hex":"#F4D738","family":"yellow"},{"id":"MARD-A6","hex":"#FEAC4C","family":"yellow"},{"id":"MARD-A7","hex":"#FE8B4C","family":"yellow"},{"id":"MARD-A8","hex":"#FFDA45","family":"yellow"},{"id":"MARD-A9","hex":"#FF995B","family":"yellow"},{"id":"MARD-B1","hex":"#E6EE31","family":"green"},{"id":"MARD-B10","hex":"#95D3C2","family":"green"},{"id":"MARD-B11","hex":"#5D722A","family":"green"},{"id":"MARD-B12","hex":"#166F41","family":"green"},{"id":"MARD-B13","hex":"#CAEB7B","family":"green"},{"id":"MARD-B14","hex":"#ADE946","family":"green"},{"id":"MARD-B15","hex":"#2E5132","family":"green"},{"id":"MARD-B16","hex":"#C5ED9C","family":"green"},{"id":"MARD-B17","hex":"#9BB13A","family":"green"},{"id":"MARD-B18","hex":"#E6EE49","family":"green"},{"id":"MARD-B19","hex":"#24B88C","family":"green"},{"id":"MARD-B2","hex":"#63F347","family":"green"},{"id":"MARD-B20","hex":"#C2F0CC","family":"green"},{"id":"MARD-B21","hex":"#156A6B","family":"green"},{"id":"MARD-B22","hex":"#0B3C43","family":"green"},{"id":"MARD-B23","hex":"#303A21","family":"green"},{"id":"MARD-B24","hex":"#EEFCA5","family":"green"},{"id":"MARD-B25","hex":"#4E846D","family":"green"},{"id":"MARD-B26","hex":"#8D7A35","family":"green"},{"id":"MARD-B27","hex":"#CCE1AF","family":"green"},{"id":"MARD-B28","hex":"#9EE5B9","family":"green"},{"id":"MARD-B29","hex":"#C5E254","family":"green"},{"id":"MARD-B3","hex":"#9EF780","family":"green"},{"id":"MARD-B30","hex":"#E2FCB1","family":"green"},{"id":"MARD-B31","hex":"#B0E792","family":"green"},{"id":"MARD-B32","hex":"#9CAB5A","family":"green"},{"id":"MARD-B4","hex":"#5DE035","family":"green"},{"id":"MARD-B5","hex":"#35E352","family":"green"},{"id":"MARD-B6","hex":"#65E2A6","family":"green"},{"id":"MARD-B7","hex":"#3DAF80","family":"green"},{"id":"MARD-B8","hex":"#1C9C4F","family":"green"},{"id":"MARD-B9","hex":"#27523A","family":"green"},{"id":"MARD-C1","hex":"#E8FFE7","family":"blue"},{"id":"MARD-C10","hex":"#3EBCE2","family":"blue"},{"id":"MARD-C11","hex":"#28DDDE","family":"blue"},{"id":"MARD-C12","hex":"#1C334D","family":"blue"},{"id":"MARD-C13","hex":"#CDE8FF","family":"blue"},{"id":"MARD-C14","hex":"#D5FDFF","family":"blue"},{"id":"MARD-C15","hex":"#22C4C6","family":"blue"},{"id":"MARD-C16","hex":"#1557A8","family":"blue"},{"id":"MARD-C17","hex":"#04D1F6","family":"blue"},{"id":"MARD-C18","hex":"#1D3344","family":"blue"},{"id":"MARD-C19","hex":"#1887A2","family":"blue"},{"id":"MARD-C2","hex":"#A9F9FC","family":"blue"},{"id":"MARD-C20","hex":"#176DAF","family":"blue"},{"id":"MARD-C21","hex":"#BEDDFF","family":"blue"},{"id":"MARD-C22","hex":"#67B4BE","family":"blue"},{"id":"MARD-C23","hex":"#C8E2FF","family":"blue"},{"id":"MARD-C24","hex":"#7CC4FF","family":"blue"},{"id":"MARD-C25","hex":"#A9E5E5","family":"blue"},{"id":"MARD-C26","hex":"#3CAED8","family":"blue"},{"id":"MARD-C27","hex":"#D3DFFA","family":"blue"},{"id":"MARD-C28","hex":"#BBCFED","family":"blue"},{"id":"MARD-C29","hex":"#34488E","family":"blue"},{"id":"MARD-C3","hex":"#A0E2FB","family":"blue"},{"id":"MARD-C4","hex":"#41CCFF","family":"blue"},{"id":"MARD-C5","hex":"#01ACEB","family":"blue"},{"id":"MARD-C6","hex":"#50AAF0","family":"blue"},{"id":"MARD-C7","hex":"#3677D2","family":"blue"},{"id":"MARD-C8","hex":"#0F54C0","family":"blue"},{"id":"MARD-C9","hex":"#324BCA","family":"blue"},{"id":"MARD-D1","hex":"#AEB4F2","family":"purple"},{"id":"MARD-D10","hex":"#361851","family":"purple"},{"id":"MARD-D11","hex":"#B9BAE1","family":"purple"},{"id":"MARD-D12","hex":"#DE9AD4","family":"purple"},{"id":"MARD-D13","hex":"#B90095","family":"purple"},{"id":"MARD-D14","hex":"#8B279B","family":"purple"},{"id":"MARD-D15","hex":"#2F1F90","family":"purple"},{"id":"MARD-D16","hex":"#E3E1EE","family":"purple"},{"id":"MARD-D17","hex":"#C4D4F6","family":"purple"},{"id":"MARD-D18","hex":"#A45EC7","family":"purple"},{"id":"MARD-D19","hex":"#D8C3D7","family":"purple"},{"id":"MARD-D2","hex":"#858EDD","family":"purple"},{"id":"MARD-D20","hex":"#9C32B2","family":"purple"},{"id":"MARD-D21","hex":"#9A009B","family":"purple"},{"id":"MARD-D22","hex":"#333A95","family":"purple"},{"id":"MARD-D23","hex":"#EBDAFC","family":"purple"},{"id":"MARD-D24","hex":"#7786E5","family":"purple"},{"id":"MARD-D25","hex":"#494FC7","family":"purple"},{"id":"MARD-D26","hex":"#DFC2F8","family":"purple"},{"id":"MARD-D3","hex":"#2F54AF","family":"purple"},{"id":"MARD-D4","hex":"#182A84","family":"purple"},{"id":"MARD-D5","hex":"#B843C5","family":"purple"},{"id":"MARD-D6","hex":"#AC7BDE","family":"purple"},{"id":"MARD-D7","hex":"#8854B3","family":"purple"},{"id":"MARD-D8","hex":"#E2D3FF","family":"purple"},{"id":"MARD-D9","hex":"#D5B9F8","family":"purple"},{"id":"MARD-E1","hex":"#FDD3CC","family":"pink"},{"id":"MARD-E10","hex":"#D33793","family":"pink"},{"id":"MARD-E11","hex":"#FCDDD2","family":"pink"},{"id":"MARD-E12","hex":"#F78FC3","family":"pink"},{"id":"MARD-E13","hex":"#B5006D","family":"pink"},{"id":"MARD-E14","hex":"#FFD1BA","family":"pink"},{"id":"MARD-E15","hex":"#F8C7C9","family":"pink"},{"id":"MARD-E16","hex":"#FFF3EB","family":"pink"},{"id":"MARD-E17","hex":"#FFE2EA","family":"pink"},{"id":"MARD-E18","hex":"#FFC7DB","family":"pink"},{"id":"MARD-E19","hex":"#FEBAD5","family":"pink"},{"id":"MARD-E2","hex":"#FEC0DF","family":"pink"},{"id":"MARD-E20","hex":"#D8C7D1","family":"pink"},{"id":"MARD-E21","hex":"#BD9DA1","family":"pink"},{"id":"MARD-E22","hex":"#B785A1","family":"pink"},{"id":"MARD-E23","hex":"#937A8D","family":"pink"},{"id":"MARD-E24","hex":"#E1BCE8","family":"pink"},{"id":"MARD-E3","hex":"#FFB7E7","family":"pink"},{"id":"MARD-E4","hex":"#E8649E","family":"pink"},{"id":"MARD-E5","hex":"#F551A2","family":"pink"},{"id":"MARD-E6","hex":"#F13D74","family":"pink"},{"id":"MARD-E7","hex":"#C63478","family":"pink"},{"id":"MARD-E8","hex":"#FFDBE9","family":"pink"},{"id":"MARD-E9","hex":"#E970CC","family":"pink"},{"id":"MARD-F1","hex":"#FD957B","family":"red"},{"id":"MARD-F10","hex":"#8A4526","family":"red"},{"id":"MARD-F11","hex":"#5A2121","family":"red"},{"id":"MARD-F12","hex":"#FD4E6A","family":"red"},{"id":"MARD-F13","hex":"#F35744","family":"red"},{"id":"MARD-F14","hex":"#FFA9AD","family":"red"},{"id":"MARD-F15","hex":"#D30022","family":"red"},{"id":"MARD-F16","hex":"#FEC2A6","family":"red"},{"id":"MARD-F17","hex":"#E69C79","family":"red"},{"id":"MARD-F18","hex":"#D37C46","family":"red"},{"id":"MARD-F19","hex":"#C1444A","family":"red"},{"id":"MARD-F2","hex":"#FC3D46","family":"red"},{"id":"MARD-F20","hex":"#CD9391","family":"red"},{"id":"MARD-F21","hex":"#F7B4C6","family":"red"},{"id":"MARD-F22","hex":"#FDC0D0","family":"red"},{"id":"MARD-F23","hex":"#F67E66","family":"red"},{"id":"MARD-F24","hex":"#E698AA","family":"red"},{"id":"MARD-F25","hex":"#E54B4F","family":"red"},{"id":"MARD-F3","hex":"#F74941","family":"red"},{"id":"MARD-F4","hex":"#FC283C","family":"red"},{"id":"MARD-F5","hex":"#E7002F","family":"red"},{"id":"MARD-F6","hex":"#943630","family":"red"},{"id":"MARD-F7","hex":"#971937","family":"red"},{"id":"MARD-F8","hex":"#BC0028","family":"red"},{"id":"MARD-F9","hex":"#E2677A","family":"red"},{"id":"MARD-G1","hex":"#FFE2CE","family":"brown"},{"id":"MARD-G10","hex":"#D98C39","family":"brown"},{"id":"MARD-G11","hex":"#E0C593","family":"brown"},{"id":"MARD-G12","hex":"#FFC890","family":"brown"},{"id":"MARD-G13","hex":"#B7714A","family":"brown"},{"id":"MARD-G14","hex":"#8D614C","family":"brown"},{"id":"MARD-G15","hex":"#FCF9E0","family":"brown"},{"id":"MARD-G16","hex":"#F2D9BA","family":"brown"},{"id":"MARD-G17","hex":"#78524B","family":"brown"},{"id":"MARD-G18","hex":"#FFE4CC","family":"brown"},{"id":"MARD-G19","hex":"#E07935","family":"brown"},{"id":"MARD-G2","hex":"#FFC4AA","family":"brown"},{"id":"MARD-G20","hex":"#A94023","family":"brown"},{"id":"MARD-G21","hex":"#B88558","family":"brown"},{"id":"MARD-G3","hex":"#F4C3A5","family":"brown"},{"id":"MARD-G4","hex":"#E1B383","family":"brown"},{"id":"MARD-G5","hex":"#EDB045","family":"brown"},{"id":"MARD-G6","hex":"#E99C17","family":"brown"},{"id":"MARD-G7","hex":"#9D5B3E","family":"brown"},{"id":"MARD-G8","hex":"#753832","family":"brown"},{"id":"MARD-G9","hex":"#E6B483","family":"brown"},{"id":"MARD-H1","hex":"#FDFBFF","family":"white"},{"id":"MARD-H10","hex":"#EEE9EA","family":"gray"},{"id":"MARD-H11","hex":"#CECDD5","family":"gray"},{"id":"MARD-H12","hex":"#FFF5ED","family":"gray"},{"id":"MARD-H13","hex":"#F5ECD2","family":"gray"},{"id":"MARD-H14","hex":"#CFD7D3","family":"gray"},{"id":"MARD-H15","hex":"#98A6A8","family":"gray"},{"id":"MARD-H16","hex":"#1D1414","family":"black"},{"id":"MARD-H17","hex":"#F1EDED","family":"gray"},{"id":"MARD-H18","hex":"#FFFDF0","family":"gray"},{"id":"MARD-H19","hex":"#F6EFE2","family":"gray"},{"id":"MARD-H2","hex":"#FEFFFF","family":"white"},{"id":"MARD-H20","hex":"#949FA3","family":"gray"},{"id":"MARD-H21","hex":"#FFFBE1","family":"gray"},{"id":"MARD-H22","hex":"#CACAD4","family":"gray"},{"id":"MARD-H23","hex":"#9A9D94","family":"gray"},{"id":"MARD-H3","hex":"#B6B1BA","family":"gray"},{"id":"MARD-H4","hex":"#89858C","family":"gray"},{"id":"MARD-H5","hex":"#48464E","family":"gray"},{"id":"MARD-H6","hex":"#2F2B2F","family":"gray"},{"id":"MARD-H7","hex":"#000000","family":"black"},{"id":"MARD-H8","hex":"#E7D6DB","family":"gray"},{"id":"MARD-H9","hex":"#EDEDED","family":"gray"},{"id":"MARD-M1","hex":"#BCC6B8","family":"brown"},{"id":"MARD-M10","hex":"#C5B2BC","family":"brown"},{"id":"MARD-M11","hex":"#9F7594","family":"brown"},{"id":"MARD-M12","hex":"#644749","family":"brown"},{"id":"MARD-M13","hex":"#D19066","family":"brown"},{"id":"MARD-M14","hex":"#C77362","family":"brown"},{"id":"MARD-M15","hex":"#757D78","family":"brown"},{"id":"MARD-M2","hex":"#8AA386","family":"brown"},{"id":"MARD-M3","hex":"#697D80","family":"brown"},{"id":"MARD-M4","hex":"#E3D2BC","family":"brown"},{"id":"MARD-M5","hex":"#D0CCAA","family":"brown"},{"id":"MARD-M6","hex":"#B0A782","family":"brown"},{"id":"MARD-M7","hex":"#B4A497","family":"brown"},{"id":"MARD-M8","hex":"#B38281","family":"brown"},{"id":"MARD-M9","hex":"#A58767","family":"brown"},{"id":"MARD-P1","hex":"#FCF7F8","family":"gray"},{"id":"MARD-P10","hex":"#D9C7EA","family":"gray"},{"id":"MARD-P11","hex":"#F3ECC9","family":"gray"},{"id":"MARD-P12","hex":"#E6EEF2","family":"gray"},{"id":"MARD-P13","hex":"#AACBEF","family":"gray"},{"id":"MARD-P14","hex":"#337680","family":"gray"},{"id":"MARD-P15","hex":"#668575","family":"gray"},{"id":"MARD-P16","hex":"#FEBF45","family":"gray"},{"id":"MARD-P17","hex":"#FEA324","family":"gray"},{"id":"MARD-P18","hex":"#FEB89F","family":"gray"},{"id":"MARD-P19","hex":"#FFFEEC","family":"gray"},{"id":"MARD-P2","hex":"#B0A9AC","family":"gray"},{"id":"MARD-P20","hex":"#FEBECF","family":"gray"},{"id":"MARD-P21","hex":"#ECBEBF","family":"gray"},{"id":"MARD-P22","hex":"#E4A89F","family":"gray"},{"id":"MARD-P23","hex":"#A56268","family":"gray"},{"id":"MARD-P3","hex":"#AFDCAB","family":"gray"},{"id":"MARD-P4","hex":"#FEA49F","family":"gray"},{"id":"MARD-P5","hex":"#EE8C3E","family":"gray"},{"id":"MARD-P6","hex":"#5FD0A7","family":"gray"},{"id":"MARD-P7","hex":"#EB9270","family":"gray"},{"id":"MARD-P8","hex":"#F0D958","family":"gray"},{"id":"MARD-P9","hex":"#D9D9D9","family":"gray"},{"id":"MARD-Q1","hex":"#F2A5E8","family":"special"},{"id":"MARD-Q2","hex":"#E9EC91","family":"special"},{"id":"MARD-Q3","hex":"#FFFF00","family":"special"},{"id":"MARD-Q4","hex":"#FFEBFA","family":"special"},{"id":"MARD-Q5","hex":"#76CEDE","family":"special"},{"id":"MARD-R1","hex":"#D50D21","family":"special"},{"id":"MARD-R10","hex":"#FFDB4C","family":"special"},{"id":"MARD-R11","hex":"#FFEBFA","family":"special"},{"id":"MARD-R12","hex":"#D8D5CE","family":"special"},{"id":"MARD-R13","hex":"#55514C","family":"special"},{"id":"MARD-R14","hex":"#9FE4DF","family":"special"},{"id":"MARD-R15","hex":"#77CEE9","family":"special"},{"id":"MARD-R16","hex":"#3ECFCA","family":"special"},{"id":"MARD-R17","hex":"#4A867A","family":"special"},{"id":"MARD-R18","hex":"#7FCD9D","family":"special"},{"id":"MARD-R19","hex":"#CDE55D","family":"special"},{"id":"MARD-R2","hex":"#F92F83","family":"special"},{"id":"MARD-R20","hex":"#E8C7B4","family":"special"},{"id":"MARD-R21","hex":"#AD6F3C","family":"special"},{"id":"MARD-R22","hex":"#6C372F","family":"special"},{"id":"MARD-R23","hex":"#FEB872","family":"special"},{"id":"MARD-R24","hex":"#F3C1C0","family":"special"},{"id":"MARD-R25","hex":"#C9675E","family":"special"},{"id":"MARD-R26","hex":"#D293BE","family":"special"},{"id":"MARD-R27","hex":"#EA8CB1","family":"special"},{"id":"MARD-R28","hex":"#9C87D6","family":"special"},{"id":"MARD-R3","hex":"#FD8324","family":"special"},{"id":"MARD-R4","hex":"#F8EC31","family":"special"},{"id":"MARD-R5","hex":"#35C75B","family":"special"},{"id":"MARD-R6","hex":"#238891","family":"special"},{"id":"MARD-R7","hex":"#19779D","family":"special"},{"id":"MARD-R8","hex":"#1A60C3","family":"special"},{"id":"MARD-R9","hex":"#9A56B4","family":"special"},{"id":"MARD-T1","hex":"#FFFFFF","family":"white"},{"id":"MARD-Y1","hex":"#FD6FB4","family":"special"},{"id":"MARD-Y2","hex":"#FEB481","family":"special"},{"id":"MARD-Y3","hex":"#D7FAA0","family":"special"},{"id":"MARD-Y4","hex":"#8BDBFA","family":"special"},{"id":"MARD-Y5","hex":"#E987EA","family":"special"},{"id":"MARD-ZG1","hex":"#DAABB3","family":"special"},{"id":"MARD-ZG2","hex":"#D6AA87","family":"special"},{"id":"MARD-ZG3","hex":"#C1BD8D","family":"special"},{"id":"MARD-ZG4","hex":"#96869F","family":"special"},{"id":"MARD-ZG5","hex":"#8490A6","family":"special"},{"id":"MARD-ZG6","hex":"#94BFE2","family":"special"},{"id":"MARD-ZG7","hex":"#E2A9D2","family":"special"},{"id":"MARD-ZG8","hex":"#AB91C0","family":"special"}];
+const FAMILY_ORDER = ['red','pink','yellow','brown','green','blue','purple','gray','white','black','special'];
+const FAMILY_LABEL = {
+  red:'红色系', pink:'粉色系', yellow:'黄/橙色系', brown:'棕/咖色系',
+  green:'绿色系', blue:'蓝色系', purple:'紫色系',
+  gray:'灰色系', white:'白色系', black:'黑色系', special:'特殊色'
+};
+const FAMILY_REP = {
+  red:'#e54b4f', pink:'#f78fc3', yellow:'#ffd166', brown:'#8d614c',
+  green:'#1c9c4f', blue:'#1557a8', purple:'#8854b3',
+  gray:'#9aa3af', white:'#fafafa', black:'#1d1414', special:'#f2a5e8'
+};
+
+function hexToRgb(hex){
+  const h = hex.replace('#','');
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+function rgbToLab(r,g,b){
+  let R=r/255,G=g/255,B=b/255;
+  R = R>0.04045?Math.pow((R+0.055)/1.055,2.4):R/12.92;
+  G = G>0.04045?Math.pow((G+0.055)/1.055,2.4):G/12.92;
+  B = B>0.04045?Math.pow((B+0.055)/1.055,2.4):B/12.92;
+  let X = (R*0.4124564+G*0.3575761+B*0.1804375)/0.95047;
+  let Y = (R*0.2126729+G*0.7151522+B*0.0721750)/1.0;
+  let Z = (R*0.0193339+G*0.1191920+B*0.9503041)/1.08883;
+  const f = t => t>0.008856?Math.cbrt(t):(7.787*t+16/116);
+  return [116*f(Y)-16, 500*(f(X)-f(Y)), 200*(f(Y)-f(Z))];
+}
+
+/* Build palette: enrich with rgb + lab, group by family */
+const PALETTE = MARD_RAW.map(c => {
+  const rgb = hexToRgb(c.hex);
+  return { id: c.id, hex: c.hex.toUpperCase(), rgb, lab: rgbToLab(...rgb), family: c.family };
+});
+const PALETTE_BY_ID = Object.fromEntries(PALETTE.map(c => [c.id, c]));
+const FAMILIES = (() => {
+  const map = {};
+  for (const c of PALETTE) (map[c.family] ||= []).push(c);
+  return FAMILY_ORDER.filter(f => map[f]).map(f => ({ family: f, colors: map[f].sort((a,b)=>a.id.localeCompare(b.id, undefined, {numeric:true})) }));
+})();
+
+function findNearestColor(rgb){
+  const lab = rgbToLab(...rgb);
+  let best = PALETTE[0], bd = Infinity;
+  for (const c of PALETTE){
+    const dL=lab[0]-c.lab[0], da=lab[1]-c.lab[1], db=lab[2]-c.lab[2];
+    const d = dL*dL + da*da + db*db;
+    if (d < bd) { bd = d; best = c; }
+  }
+  return best;
+}
+
+/* ============== Editor State ============== */
+const BEAD_MM = 2.6;     // mini-bead spec, switched from 5mm midi per sage 2026-05-13
+const state = {
+  size: 29,
+  grid: null,            // 2D array [size][size] of color id or null
+  beadStyle: 'solid',    // 'solid' | 'hollow' | 'fineGlitter' | 'coarseGlitter' | 'fluffy'
+  selectedColorId: 'MARD-E5',  // start with a pink
+  tool: 'brush',
+  zoom: 1,
+  pan: { x: 0, y: 0 },
+  history: [],
+  historyIdx: -1,
+};
+
+function makeGrid(size) {
+  return Array.from({length: size}, () => Array(size).fill(null));
+}
+function cloneGrid(g) {
+  return g.map(row => row.slice());
+}
+function pushHistory() {
+  state.history = state.history.slice(0, state.historyIdx + 1);
+  state.history.push(cloneGrid(state.grid));
+  if (state.history.length > 50) state.history.shift();
+  state.historyIdx = state.history.length - 1;
+  refreshActionBar();
+}
+function undo() {
+  if (state.historyIdx <= 0) return;
+  state.historyIdx--;
+  state.grid = cloneGrid(state.history[state.historyIdx]);
+  renderCanvas(); renderMaterials(); refreshActionBar();
+}
+function redo() {
+  if (state.historyIdx >= state.history.length - 1) return;
+  state.historyIdx++;
+  state.grid = cloneGrid(state.history[state.historyIdx]);
+  renderCanvas(); renderMaterials(); refreshActionBar();
+}
+function refreshActionBar() {
+  document.getElementById('btn-undo').disabled = state.historyIdx <= 0;
+  document.getElementById('btn-redo').disabled = state.historyIdx >= state.history.length - 1;
+}
+
+function initGrid(size) {
+  state.size = size;
+  state.grid = makeGrid(size);
+  state.history = [cloneGrid(state.grid)];
+  state.historyIdx = 0;
+  document.getElementById('m-size').textContent = `${size}×${size}`;
+  fitCanvas();
+  renderCanvas();
+  renderMaterials();
+  refreshActionBar();
+}
+
+/* ============== Editor Size Selector ============== */
+function syncEditorSizeUI() {
+  document.querySelectorAll('#editor-size-row .size-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.size, 10) === state.size);
+  });
+  const hint = document.getElementById('size-source-hint');
+  if (hint) hint.textContent = state.sourceImage ? '改尺寸将重新像素化' : '';
+}
+function changeEditorSize(newSize) {
+  if (newSize === state.size) return;
+  if (state.sourceImage) {
+    // Re-pixelate from original image with same style choice
+    const img = state.sourceImage;
+    const bgRemove = !!state.sourceBgRemove;
+    const mode = state.sourceMode || 'realistic';
+    const grid = mode === 'cute'
+      ? generateCute(img, newSize, bgRemove)
+      : generateRealistic(img, newSize, bgRemove);
+    state.size = newSize;
+    state.grid = grid;
+    state.history = [cloneGrid(grid)];
+    state.historyIdx = 0;
+    document.getElementById('m-size').textContent = `${newSize}×${newSize}`;
+    fitCanvas();
+    renderCanvas();
+    renderMaterials();
+    refreshActionBar();
+  } else {
+    // No source image — confirm before wiping the blank/edited grid
+    const hasContent = state.grid.some(row => row.some(c => c));
+    if (hasContent && !confirm(`改成 ${newSize}×${newSize} 会清空当前图纸，确认？`)) {
+      syncEditorSizeUI();
+      return;
+    }
+    initGrid(newSize);
+  }
+  syncEditorSizeUI();
+}
+document.querySelectorAll('#editor-size-row .size-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    changeEditorSize(parseInt(b.dataset.size, 10));
+  });
+});
+
+/* ============== View Switching ============== */
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('v-' + name).classList.add('active');
+  document.querySelector(`.tab[data-view="${name}"]`).classList.add('active');
+  if (name === 'export') renderExport();
+  if (name === 'editor') requestAnimationFrame(() => { fitCanvas(); renderCanvas(); });
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchView(t.dataset.view)));
+document.getElementById('btn-go-export').addEventListener('click', () => switchView('export'));
+
+/* ============== Landing Actions ============== */
+let landingSize = 29;
+document.querySelectorAll('.size-btn').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.size-btn').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  landingSize = parseInt(b.dataset.size, 10);
+}));
+document.getElementById('btn-blank').addEventListener('click', () => {
+  initGrid(landingSize);
+  state.sourceImage = null;
+  state.sourceMode = null;
+  syncEditorSizeUI();
+  switchView('editor');
+});
+document.getElementById('upload-area').addEventListener('click', (e) => {
+  if (e.target.id === 'upload-input') return;
+  const inp = document.getElementById('upload-input');
+  inp.value = '';
+  inp.click();
+});
+document.getElementById('upload-input').addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  if (file) handleImageUpload(file, landingSize);
+  e.target.value = ''; // allow re-uploading same file
+});
+// Drag & drop
+const dropZone = document.getElementById('upload-area');
+['dragenter','dragover'].forEach(ev => dropZone.addEventListener(ev, (e) => {
+  e.preventDefault(); dropZone.classList.add('drag-over');
+}));
+['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, (e) => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+}));
+dropZone.addEventListener('drop', (e) => {
+  const file = e.dataTransfer?.files?.[0];
+  if (file && file.type.startsWith('image/')) handleImageUpload(file, landingSize);
+});
+document.getElementById('btn-reupload').addEventListener('click', () => {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = (e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, state.size); };
+  inp.click();
+});
+
+function handleImageUpload(file, size) {
+  const img = new Image();
+  img.onload = () => openCompareModal(img, size);
+  img.src = URL.createObjectURL(file);
+}
+
+/* ============== Image Processing Pipelines ============== */
+function rgbToLab2(r,g,b){ return rgbToLab(r,g,b); } // alias for clarity
+
+function gridFromImageData(data, size) {
+  const grid = makeGrid(size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      if (data[i+3] < 64) continue;
+      grid[y][x] = findNearestColor([data[i], data[i+1], data[i+2]]).id;
+    }
+  }
+  return grid;
+}
+
+/* High-res render + parallel blurred render for USM */
+function generateHiresPair(img, size, scale = 4, blurPx = 1.5) {
+  const w = size * scale;
+  const s = Math.min(img.width, img.height);
+  const sx = (img.width - s) / 2, sy = (img.height - s) / 2;
+
+  const co = document.createElement('canvas');
+  co.width = w; co.height = w;
+  const ctxo = co.getContext('2d', { willReadFrequently: true });
+  ctxo.imageSmoothingEnabled = true;
+  ctxo.imageSmoothingQuality = 'high';
+  ctxo.drawImage(img, sx, sy, s, s, 0, 0, w, w);
+
+  const cb = document.createElement('canvas');
+  cb.width = w; cb.height = w;
+  const ctxb = cb.getContext('2d', { willReadFrequently: true });
+  ctxb.imageSmoothingEnabled = true;
+  ctxb.imageSmoothingQuality = 'high';
+  ctxb.filter = `blur(${blurPx}px)`;
+  ctxb.drawImage(img, sx, sy, s, s, 0, 0, w, w);
+  ctxb.filter = 'none';
+
+  return { orig: ctxo.getImageData(0, 0, w, w).data, blurred: ctxb.getImageData(0, 0, w, w).data, w };
+}
+
+/* Unsharp Mask: sharpened = orig + amount * (orig - blurred), clamped */
+function applyUSM(orig, blurred, amount) {
+  const out = new Uint8ClampedArray(orig.length);
+  for (let i = 0; i < orig.length; i += 4) {
+    for (let c = 0; c < 3; c++) {
+      const o = orig[i + c];
+      const b = blurred[i + c];
+      out[i + c] = Math.max(0, Math.min(255, o + amount * (o - b)));
+    }
+    out[i + 3] = orig[i + 3];
+  }
+  return out;
+}
+
+/* Sobel magnitude on grayscale of RGBA buffer */
+function computeSobelMag(data, w, h) {
+  const mag = new Float32Array(w * h);
+  const gray = (a) => 0.3*data[a] + 0.59*data[a+1] + 0.11*data[a+2];
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const tl = gray(((y-1)*w+x-1)*4), t = gray(((y-1)*w+x)*4), tr = gray(((y-1)*w+x+1)*4);
+      const ml = gray((y*w+x-1)*4),                              mr = gray((y*w+x+1)*4);
+      const bl = gray(((y+1)*w+x-1)*4), bm = gray(((y+1)*w+x)*4), br = gray(((y+1)*w+x+1)*4);
+      const gx = (tr + 2*mr + br) - (tl + 2*ml + bl);
+      const gy = (bl + 2*bm + br) - (tl + 2*t  + tr);
+      mag[y*w + x] = Math.sqrt(gx*gx + gy*gy);
+    }
+  }
+  return mag;
+}
+
+/* Edge-aware downsample: each grid cell (covering scale×scale source pixels)
+   uses edge-weighted color when edges dominate, otherwise mean. */
+function edgeAwareDownsample(data, mag, w, scale, gridSize, threshold) {
+  const grid = makeGrid(gridSize);
+  const total = scale * scale;
+  for (let gy = 0; gy < gridSize; gy++) {
+    for (let gx = 0; gx < gridSize; gx++) {
+      let edgeR = 0, edgeG = 0, edgeB = 0, edgeW = 0, edgeCount = 0;
+      let avgR = 0, avgG = 0, avgB = 0, avgN = 0, alphaSum = 0;
+      for (let py = gy*scale; py < (gy+1)*scale; py++) {
+        for (let px = gx*scale; px < (gx+1)*scale; px++) {
+          const idx = (py * w + px) * 4;
+          const a = data[idx + 3];
+          alphaSum += a;
+          if (a < 64) continue;
+          avgR += data[idx]; avgG += data[idx+1]; avgB += data[idx+2]; avgN++;
+          const m = mag[py * w + px] || 0;
+          if (m > threshold) {
+            edgeCount++;
+            edgeR += data[idx] * m;
+            edgeG += data[idx+1] * m;
+            edgeB += data[idx+2] * m;
+            edgeW += m;
+          }
+        }
+      }
+      if (alphaSum / total < 64) continue;
+      let r, g, b;
+      if (edgeCount >= total * 0.25 && edgeW > 0) {
+        r = edgeR / edgeW; g = edgeG / edgeW; b = edgeB / edgeW;
+      } else if (avgN > 0) {
+        r = avgR / avgN; g = avgG / avgN; b = avgB / avgN;
+      } else continue;
+      grid[gy][gx] = findNearestColor([r, g, b]).id;
+    }
+  }
+  return grid;
+}
+
+function reducePaletteToTopN(grid, size, n) {
+  const counts = new Map();
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const id = grid[y][x]; if (!id) continue;
+    counts.set(id, (counts.get(id) || 0) + 1);
+  }
+  if (counts.size <= n) return grid;
+  const top = [...counts.entries()].sort((a,b) => b[1] - a[1]).slice(0, n).map(e => PALETTE_BY_ID[e[0]]);
+  const topSet = new Set(top.map(c => c.id));
+  const out = makeGrid(size);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const id = grid[y][x]; if (!id) { continue; }
+    if (topSet.has(id)) { out[y][x] = id; continue; }
+    const c = PALETTE_BY_ID[id];
+    let best = top[0], bd = Infinity;
+    for (const t of top) {
+      const dL=c.lab[0]-t.lab[0], da=c.lab[1]-t.lab[1], db=c.lab[2]-t.lab[2];
+      const d = dL*dL + da*da + db*db;
+      if (d < bd) { bd = d; best = t; }
+    }
+    out[y][x] = best.id;
+  }
+  return out;
+}
+
+function removeBackgroundHeuristic(srcData, w, h) {
+  // Sample 4 corners + 4 edge midpoints
+  const samples = [
+    [0,0], [w-1,0], [0,h-1], [w-1,h-1],
+    [Math.floor(w/2),0], [0,Math.floor(h/2)],
+    [Math.floor(w/2),h-1], [w-1,Math.floor(h/2)]
+  ];
+  const labs = samples.map(([x,y]) => {
+    const i = (y*w + x)*4;
+    return rgbToLab(srcData[i], srcData[i+1], srcData[i+2]);
+  });
+  const labDist = (a,b) => Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2);
+  // Find largest cluster of similar bg samples (cluster radius 14 in Lab)
+  let bestCluster = null, bestCount = 0;
+  for (let i = 0; i < labs.length; i++) {
+    const cluster = [labs[i]];
+    for (let j = 0; j < labs.length; j++) {
+      if (i !== j && labDist(labs[i], labs[j]) < 14) cluster.push(labs[j]);
+    }
+    if (cluster.length > bestCount) { bestCount = cluster.length; bestCluster = cluster; }
+  }
+  // Need consensus from ≥5 of 8 samples — otherwise bg is too varied (image likely full-bleed)
+  if (bestCount < 5) return null;
+  const bg = [0,0,0];
+  for (const l of bestCluster) { bg[0]+=l[0]; bg[1]+=l[1]; bg[2]+=l[2]; }
+  bg[0]/=bestCluster.length; bg[1]/=bestCluster.length; bg[2]/=bestCluster.length;
+
+  const out = new Uint8ClampedArray(srcData);
+  const HARD = 16, SOFT = 26;
+  const total = w * h;
+  // Per-pixel classification: 0=not bg-color, 1=hard match, 2=soft match
+  const near = new Uint8Array(total);
+  const dArr = new Float32Array(total);
+  for (let p = 0; p < total; p++) {
+    const i = p * 4;
+    const lab = rgbToLab(srcData[i], srcData[i+1], srcData[i+2]);
+    const d = labDist(lab, bg);
+    dArr[p] = d;
+    if (d < HARD) near[p] = 1;
+    else if (d < SOFT) near[p] = 2;
+  }
+  // Flood-fill from edges through near-bg pixels — only background that's
+  // CONNECTED to the image boundary gets erased. Interior pixels matching
+  // bg color (teeth, white shirt, eye whites) stay opaque.
+  const reachable = new Uint8Array(total);
+  const queue = [];
+  const seedEdge = (p) => { if (near[p] !== 0 && !reachable[p]) { reachable[p] = 1; queue.push(p); } };
+  for (let x = 0; x < w; x++) { seedEdge(x); seedEdge((h-1)*w + x); }
+  for (let y = 0; y < h; y++) { seedEdge(y*w); seedEdge(y*w + w - 1); }
+  while (queue.length) {
+    const p = queue.pop();
+    const x = p % w, y = (p - x) / w;
+    if (x > 0)   { const np = p - 1; if (near[np] !== 0 && !reachable[np]) { reachable[np] = 1; queue.push(np); } }
+    if (x < w-1) { const np = p + 1; if (near[np] !== 0 && !reachable[np]) { reachable[np] = 1; queue.push(np); } }
+    if (y > 0)   { const np = p - w; if (near[np] !== 0 && !reachable[np]) { reachable[np] = 1; queue.push(np); } }
+    if (y < h-1) { const np = p + w; if (near[np] !== 0 && !reachable[np]) { reachable[np] = 1; queue.push(np); } }
+  }
+  // Only erase pixels reachable from edge — preserves subject's bg-colored interior
+  for (let p = 0; p < total; p++) {
+    if (!reachable[p]) continue;
+    const i = p * 4;
+    if (near[p] === 1) {
+      out[i+3] = 0;
+    } else if (near[p] === 2) {
+      const d = dArr[p];
+      out[i+3] = Math.min(out[i+3], Math.floor(((d - HARD) / (SOFT - HARD)) * 255));
+    }
+  }
+  return out;
+}
+
+function generateRealistic(img, size, bgRemove) {
+  // High-res 4x render → optional bg mask → strong USM (preserve eyes/mouth) → Sobel → edge-aware sample
+  const { orig, blurred, w } = generateHiresPair(img, size, 4, 1.5);
+  const masked = bgRemove ? (removeBackgroundHeuristic(orig, w, w) || orig) : orig;
+  const sharp = applyUSM(masked, blurred, 0.9);
+  const mag = computeSobelMag(sharp, w, w);
+  return edgeAwareDownsample(sharp, mag, w, 4, size, 70);
+}
+
+function generateCute(img, size, bgRemove) {
+  const sharp = applyUSM(orig, blurred, 0.9);
+  const mag = computeSobelMag(sharp, w, w);
+  return edgeAwareDownsample(sharp, mag, w, 4, size, 70);
+}
+
+function generateCute(img, size, bgRemove) {
+  // Lighter sharpen + edge-aware sample → reduce to ~10 colors for cartoon block look
+  const { orig, blurred, w } = generateHiresPair(img, size, 4, 1.5);
+  const masked = bgRemove ? (removeBackgroundHeuristic(orig, w, w) || orig) : orig;
+  const sharp = applyUSM(masked, blurred, 0.4);
+  const mag = computeSobelMag(sharp, w, w);
+  const raw = edgeAwareDownsample(sharp, mag, w, 4, size, 70);
+  const target = Math.min(12, Math.max(6, Math.round(size * size / 80)));
+  return reducePaletteToTopN(raw, size, target);
+}
+
+function estimateComplexity(img) {
+  // Sample at 64x64, compute average edge intensity (Sobel-lite)
+  const N = 64;
+  const off = document.createElement('canvas');
+  off.width = N; off.height = N;
+  const ctx = off.getContext('2d', { willReadFrequently: true });
+  const s = Math.min(img.width, img.height);
+  const sx = (img.width - s) / 2, sy = (img.height - s) / 2;
+  ctx.drawImage(img, sx, sy, s, s, 0, 0, N, N);
+  const data = ctx.getImageData(0, 0, N, N).data;
+  let sum = 0, n = 0;
+  for (let y = 1; y < N - 1; y++) {
+    for (let x = 1; x < N - 1; x++) {
+      const i = (y * N + x) * 4;
+      const ir = ((y * N + x + 1) * 4);
+      const id = (((y + 1) * N + x) * 4);
+      const dx = Math.abs(data[i] - data[ir]) + Math.abs(data[i+1] - data[ir+1]) + Math.abs(data[i+2] - data[ir+2]);
+      const dy = Math.abs(data[i] - data[id]) + Math.abs(data[i+1] - data[id+1]) + Math.abs(data[i+2] - data[id+2]);
+      sum += dx + dy;
+      n++;
+    }
+  }
+  return sum / n; // 0 → flat, 50+ → portraits/illustrations, 80+ → very dense
+}
+
+function suggestUpSize(complexity, currentSize) {
+  if (currentSize >= 58) return null;
+  if (complexity > 70 && currentSize < 58) return 58;
+  if (complexity > 40 && currentSize < 50) return 50;
+  return null;
+}
+
+function countUnique(grid) {
+  const s = new Set();
+  for (const row of grid) for (const id of row) if (id) s.add(id);
+  return s.size;
+}
+function countBeads(grid) {
+  let n = 0;
+  for (const row of grid) for (const id of row) if (id) n++;
+  return n;
+}
+
+/* Compare Modal */
+let pendingImg = null;
+let pendingSize = 29;
+let pendingResults = null;
+
+function openCompareModal(img, size) {
+  pendingImg = img;
+  pendingSize = size;
+  pendingResults = null;
+  const modal = document.getElementById('compare-modal');
+  const loading = document.getElementById('compare-loading');
+  const content = document.getElementById('compare-content');
+  loading.hidden = false;
+  content.hidden = true;
+  modal.classList.add('open');
+  // run in next frame so modal paints first
+  requestAnimationFrame(() => requestAnimationFrame(() => runComparison()));
+}
+
+function runComparison() {
+  const img = pendingImg, size = pendingSize;
+  // suggestion
+  const complexity = estimateComplexity(img);
+  const suggested = suggestUpSize(complexity, size);
+  const sugBox = document.getElementById('size-suggestion');
+  if (suggested) {
+    sugBox.hidden = false;
+    const reason = complexity > 70 ? '细节非常密集（如人像、五官）' : '细节较丰富';
+    document.getElementById('suggestion-text').textContent = `图片${reason}（复杂度 ${Math.round(complexity)}），${size}×${size}（约 ${(size*BEAD_MM/10).toFixed(1)}cm）容易丢失五官等关键特征，建议改为 ${suggested}×${suggested}（约 ${(suggested*BEAD_MM/10).toFixed(1)}cm）`;
+    document.getElementById('suggestion-size').textContent = suggested;
+    document.getElementById('suggestion-size-2').textContent = suggested;
+    document.getElementById('suggestion-apply').onclick = () => {
+      pendingSize = suggested;
+      runComparison();
+    };
+  } else {
+    sugBox.hidden = true;
+  }
+
+  const bgRemove = document.getElementById('bg-remove-toggle')?.checked ?? true;
+  const realistic = generateRealistic(img, pendingSize, bgRemove);
+  const cute = generateCute(img, pendingSize, bgRemove);
+  pendingResults = { realistic, cute };
+  drawComparePreview(document.getElementById('canvas-realistic'), realistic, pendingSize);
+  drawComparePreview(document.getElementById('canvas-cute'), cute, pendingSize);
+  document.getElementById('stats-realistic').textContent = `约需 ${countUnique(realistic)} 种颜色 · ${countBeads(realistic)} 颗豆子`;
+  document.getElementById('stats-cute').textContent = `约需 ${countUnique(cute)} 种颜色 · ${countBeads(cute)} 颗豆子`;
+  document.getElementById('compare-loading').hidden = true;
+  document.getElementById('compare-content').hidden = false;
+}
+
+function drawComparePreview(canvas, grid, size) {
+  const px = 8;
+  canvas.width = size * px;
+  canvas.height = size * px;
+  const c = canvas.getContext('2d');
+  c.fillStyle = '#ffffff';
+  c.fillRect(0, 0, canvas.width, canvas.height);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const id = grid[y][x];
+      if (!id) continue;
+      const col = PALETTE_BY_ID[id];
+      c.fillStyle = col.hex;
+      c.beginPath();
+      c.arc(x * px + px/2, y * px + px/2, px * 0.42, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+}
+
+function pickStyle(mode) {
+  if (!pendingResults) return;
+  const grid = pendingResults[mode];
+  initGrid(pendingSize);
+  state.grid = grid;
+  state.history = [cloneGrid(grid)];
+  state.historyIdx = 0;
+  // Remember source so editor's size selector can re-pixelate
+  state.sourceImage = pendingImg;
+  state.sourceMode = mode;
+  state.sourceBgRemove = document.getElementById('bg-remove-toggle')?.checked ?? true;
+  syncEditorSizeUI();
+  refreshActionBar();
+  renderCanvas();
+  renderMaterials();
+  document.getElementById('compare-modal').classList.remove('open');
+  switchView('editor');
+  pendingImg = null; pendingResults = null;
+}
+
+document.querySelectorAll('.compare-pick').forEach(btn => {
+  btn.addEventListener('click', () => pickStyle(btn.dataset.mode));
+});
+document.querySelectorAll('.compare-card').forEach(card => {
+  card.addEventListener('click', (e) => {
+    if (e.target.tagName === 'BUTTON') return;
+    pickStyle(card.dataset.mode);
+  });
+});
+document.getElementById('compare-close').addEventListener('click', () => {
+  document.getElementById('compare-modal').classList.remove('open');
+  pendingImg = null; pendingResults = null;
+});
+document.getElementById('compare-cancel').addEventListener('click', () => {
+  document.getElementById('compare-modal').classList.remove('open');
+  pendingImg = null; pendingResults = null;
+  document.getElementById('upload-input').value = '';
+  document.getElementById('upload-input').click();
+});
+document.getElementById('bg-remove-toggle').addEventListener('change', () => {
+  if (!pendingImg) return;
+  document.getElementById('compare-loading').hidden = false;
+  document.getElementById('compare-content').hidden = true;
+  requestAnimationFrame(() => requestAnimationFrame(() => runComparison()));
+});
+
+/* ============== Toolbar ============== */
+document.querySelectorAll('.tool').forEach(t => {
+  t.addEventListener('click', () => {
+    const tool = t.dataset.tool;
+    const act = t.dataset.act;
+    if (tool) {
+      state.tool = tool;
+      document.querySelectorAll('.tool[data-tool]').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      updateCursor();
+    } else if (act === 'zoom-in') zoom(1.25);
+    else if (act === 'zoom-out') zoom(0.8);
+    else if (act === 'fit') fitCanvas();
+    else if (act === 'outline') toggleOutlinePopover(t);
+  });
+});
+
+/* Bead style picker */
+document.querySelectorAll('.bs-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.bs-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.beadStyle = b.dataset.style;
+    renderCanvas();
+  });
+});
+
+/* Outline popover */
+let outlineColor = '#1a1a1a';
+let outlineNb = 4;
+function toggleOutlinePopover(anchor) {
+  const pop = document.getElementById('outline-pop');
+  if (pop.classList.contains('open')) { pop.classList.remove('open'); return; }
+  const r = anchor.getBoundingClientRect();
+  // position to the right of the toolbar button (or below on mobile)
+  if (window.innerWidth <= 768) {
+    pop.style.left = '50%';
+    pop.style.transform = 'translateX(-50%)';
+    pop.style.bottom = '70px';
+    pop.style.top = 'auto';
+    pop.style.right = 'auto';
+  } else {
+    pop.style.left = (r.right + 8) + 'px';
+    pop.style.top = r.top + 'px';
+    pop.style.transform = 'none';
+    pop.style.bottom = 'auto';
+    pop.style.right = 'auto';
+  }
+  pop.classList.add('open');
+}
+document.querySelectorAll('.outline-pop .swatch').forEach(s => {
+  s.addEventListener('click', () => {
+    document.querySelectorAll('.outline-pop .swatch').forEach(x => x.classList.remove('active'));
+    s.classList.add('active');
+    if (s.dataset.color === 'custom') {
+      const inp = document.getElementById('outline-custom');
+      inp.hidden = false;
+      inp.click();
+      inp.onchange = () => { outlineColor = inp.value; };
+    } else {
+      document.getElementById('outline-custom').hidden = true;
+      outlineColor = s.dataset.color;
+    }
+  });
+});
+document.querySelectorAll('.outline-pop .nb-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.outline-pop .nb-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    outlineNb = parseInt(b.dataset.nb, 10);
+  });
+});
+document.getElementById('outline-apply').addEventListener('click', () => {
+  applyOutline(outlineColor, outlineNb);
+  document.getElementById('outline-pop').classList.remove('open');
+});
+// click outside popover to close
+document.addEventListener('click', (e) => {
+  const pop = document.getElementById('outline-pop');
+  if (!pop.classList.contains('open')) return;
+  if (pop.contains(e.target)) return;
+  if (e.target.closest('[data-act="outline"]')) return;
+  pop.classList.remove('open');
+});
+
+/* Apply outline: fill empty cells adjacent to colored cells with closest MARD color */
+function applyOutline(hex, neighborhood) {
+  if (!state.grid) return;
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  const targetId = findNearestColor([r, g, b]).id;
+  const offsets = neighborhood === 8
+    ? [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]
+    : [[-1,0],[1,0],[0,-1],[0,1]];
+  const next = cloneGrid(state.grid);
+  let changed = 0;
+  for (let y = 0; y < state.size; y++) {
+    for (let x = 0; x < state.size; x++) {
+      if (state.grid[y][x]) continue; // already colored
+      let hasColoredNeighbor = false;
+      for (const [dx, dy] of offsets) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= state.size || ny >= state.size) continue;
+        const nid = state.grid[ny][nx];
+        if (nid && nid !== targetId) { hasColoredNeighbor = true; break; }
+      }
+      if (hasColoredNeighbor) {
+        next[y][x] = targetId;
+        changed++;
+      }
+    }
+  }
+  if (changed === 0) return;
+  state.grid = next;
+  pushHistory();
+  renderCanvas();
+  renderMaterials();
+}
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.getElementById('btn-redo').addEventListener('click', redo);
+document.getElementById('btn-new').addEventListener('click', () => {
+  if (confirm('新建会清空当前图纸，确认？')) { initGrid(state.size); }
+});
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (confirm('清空当前画布？')) { state.grid = makeGrid(state.size); pushHistory(); renderCanvas(); renderMaterials(); }
+});
+
+/* ============== Canvas Rendering ============== */
+const CELL_PX = 24;  // logical bead size in canvas pixels
+const AXIS_PX = 22;  // gutter for row/col coordinate labels
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function setCanvasSize() {
+  const px = state.size * CELL_PX;
+  canvas.width = px + AXIS_PX;
+  canvas.height = px + AXIS_PX;
+}
+
+/* Build {colorId -> sequential index 1..N} for the currently used colors,
+   sorted by family then id so the legend reads cleanly. */
+function buildColorIndex() {
+  const used = new Set();
+  for (let y = 0; y < state.size; y++) {
+    for (let x = 0; x < state.size; x++) {
+      const id = state.grid[y][x];
+      if (id) used.add(id);
+    }
+  }
+  const sorted = [...used].sort((a, b) => {
+    const ca = PALETTE_BY_ID[a], cb = PALETTE_BY_ID[b];
+    if (!ca || !cb) return 0;
+    if (ca.family !== cb.family) return ca.family.localeCompare(cb.family);
+    return ca.id.localeCompare(cb.id, undefined, { numeric: true });
+  });
+  const map = new Map();
+  sorted.forEach((id, i) => map.set(id, i + 1));
+  return map;
+}
+
+/* Auto-pick black or white text for legibility on a given hex. */
+function textColorOn(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  // Perceived luminance
+  const l = 0.299 * r + 0.587 * g + 0.114 * b;
+  return l > 165 ? '#1a1a1a' : '#ffffff';
+}
+
+/* Draw row/column coordinate labels in the gutter. */
+function drawAxisLabels(c, size, px, w, h) {
+  c.save();
+  c.fillStyle = '#fafbfc';
+  c.fillRect(0, 0, w, AXIS_PX);
+  c.fillRect(0, 0, AXIS_PX, h);
+  c.fillStyle = '#9aa0a6';
+  c.font = `600 ${Math.max(9, Math.min(11, AXIS_PX * 0.5))}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  for (let i = 0; i < size; i++) {
+    const cx = AXIS_PX + i * px + px / 2;
+    const cy = AXIS_PX + i * px + px / 2;
+    // top column labels
+    c.fillStyle = (i % 5 === 0) ? '#5f6368' : '#9aa0a6';
+    c.fillText(String(i + 1), cx, AXIS_PX / 2);
+    // left row labels
+    c.fillText(String(i + 1), AXIS_PX / 2, cy);
+  }
+  // gutter divider
+  c.strokeStyle = '#dadce0';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(AXIS_PX, 0); c.lineTo(AXIS_PX, h); c.stroke();
+  c.beginPath();
+  c.moveTo(0, AXIS_PX); c.lineTo(w, AXIS_PX); c.stroke();
+  c.restore();
+}
+
+function renderCanvas() {
+  setCanvasSize();
+  const px = CELL_PX;
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  // Pegboard guidelines (every 5)
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= state.size; i++) {
+    ctx.strokeStyle = (i % 5 === 0) ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.05)';
+    ctx.beginPath();
+    ctx.moveTo(AXIS_PX, AXIS_PX + i * px);
+    ctx.lineTo(AXIS_PX + state.size * px, AXIS_PX + i * px);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(AXIS_PX + i * px, AXIS_PX);
+    ctx.lineTo(AXIS_PX + i * px, AXIS_PX + state.size * px);
+    ctx.stroke();
+  }
+
+  const colorIndex = buildColorIndex();
+  const showNum = px >= 14;
+
+  // Beads
+  for (let y = 0; y < state.size; y++) {
+    for (let x = 0; x < state.size; x++) {
+      const id = state.grid[y][x];
+      if (!id) continue;
+      const c = PALETTE_BY_ID[id];
+      if (!c) continue;
+      const cx = AXIS_PX + x * px + px/2, cy = AXIS_PX + y * px + px/2;
+      drawBead(ctx, cx, cy, px, c.hex, state.beadStyle, (y * state.size + x) * 1009 + 17);
+      if (showNum) {
+        ctx.fillStyle = textColorOn(c.hex);
+        ctx.font = `700 ${Math.max(8, Math.floor(px * 0.42))}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(colorIndex.get(id) || ''), cx, cy + 0.5);
+      }
+    }
+  }
+  // 毛巾烫: global parchment/towel weave overlay across all colored cells
+  if (state.beadStyle === 'fluffy') drawFluffyOverlay(ctx, W, H, px, AXIS_PX);
+  // Axis labels last so they sit on top
+  drawAxisLabels(ctx, state.size, px, W, H);
+  applyTransform();
+}
+
+/* Global towel/parchment weave overlay — drawn once over the whole bead area
+   so the fabric pattern is continuous across cells (not per-bead noise).
+   axisOffset (defaults to 0) is the axis gutter, so the overlay only covers
+   the actual bead grid. */
+function drawFluffyOverlay(c, w, h, px, axisOffset) {
+  const ax = axisOffset || 0;
+  // Fine horizontal weave lines, alpha ≤ 0.05
+  const stride = Math.max(2, Math.round(px * 0.18));
+  c.save();
+  c.fillStyle = 'rgba(0,0,0,0.035)';
+  for (let y = ax; y < h; y += stride) {
+    c.fillRect(ax, y, w - ax, 1);
+  }
+  c.fillStyle = 'rgba(255,255,255,0.045)';
+  for (let y = ax + 1; y < h; y += stride) {
+    c.fillRect(ax, y + Math.floor(stride / 2), w - ax, 1);
+  }
+  // Very faint vertical weave (cross-hatch) for fabric feel
+  c.fillStyle = 'rgba(0,0,0,0.025)';
+  for (let x = ax; x < w; x += stride) {
+    c.fillRect(x, ax, 1, h - ax);
+  }
+  c.restore();
+}
+
+/* Deterministic PRNG (mulberry32) for stable glitter/fluffy rendering */
+function mulberry32(seed) {
+  let s = (seed | 0) || 1;
+  return function() {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* Render one bead with the given style.
+   `cell` = full cell pixel size. Unironed styles use a circle inside cell;
+   ironed styles (fluffy/fineGlitter/coarseGlitter) fill the whole cell as
+   fused beads with no gap and no center hole. */
+function drawBead(ctx, cx, cy, cell, hex, style, seed) {
+  const R = cell * 0.42;
+
+  if (style === 'hollow') {
+    // 空心圈 (unironed): thick ring with center hole
+    ctx.lineWidth = R * 0.45;
+    ctx.strokeStyle = hex;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.78, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.10, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  if (style === 'solid') {
+    // 普通 (unironed): solid round bead + hole + shine
+    ctx.fillStyle = hex;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.95, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.10, 0, Math.PI * 2);
+    ctx.fill();
+    const grad = ctx.createRadialGradient(cx - R*0.15, cy - R*0.15, R*0.05, cx, cy, R);
+    grad.addColorStop(0, 'rgba(255,255,255,0.45)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  // Ironed styles: fused fills, no gap, no center hole, true square (designer spec)
+  const half = cell / 2;
+  const cornerR = 0;
+  const rand = mulberry32(seed);
+
+  // Base fused square — full fillRect, slight overdraw to fully cover any
+  // underlying grid lines so adjacent cells appear truly seamless.
+  ctx.fillStyle = hex;
+  ctx.fillRect(cx - half - 0.5, cy - half - 0.5, cell + 1, cell + 1);
+
+  if (style === 'fluffy') {
+    // 毛巾烫: matte. Cell is just the base fillRect — no center highlight,
+    // no per-cell noise. The fabric/towel weave is drawn globally after
+    // all beads (see drawFluffyOverlay). Slightly desaturate the base by
+    // overlaying a faint neutral wash to suggest the matte film.
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(cx - half - 0.5, cy - half - 0.5, cell + 1, cell + 1);
+  } else if (style === 'fineGlitter') {
+    // 细闪: dense fine bright specks across fused surface
+    for (let i = 0; i < 14; i++) {
+      const sx = cx - half + rand() * cell;
+      const sy = cy - half + rand() * cell;
+      ctx.fillStyle = `rgba(255,255,255,${0.6 + rand()*0.35})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, cell * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (style === 'coarseGlitter') {
+    // 粗闪: 3-4 large soft sparkles on fused surface
+    for (let i = 0; i < 4; i++) {
+      const sx = cx - half + cell * 0.15 + rand() * cell * 0.7;
+      const sy = cy - half + cell * 0.15 + rand() * cell * 0.7;
+      const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, cell*0.20);
+      grad.addColorStop(0, 'rgba(255,255,255,0.95)');
+      grad.addColorStop(0.5, 'rgba(255,255,255,0.5)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(sx, sy, cell * 0.20, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // No seam border — fused state means continuous surface
+}
+
+function roundedRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function applyTransform() {
+  const wrap = document.getElementById('canvas-wrap');
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  const cw = canvas.width * state.zoom;
+  const ch = canvas.height * state.zoom;
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  canvas.style.left = (w/2 - cw/2 + state.pan.x) + 'px';
+  canvas.style.top = (h/2 - ch/2 + state.pan.y) + 'px';
+  document.getElementById('zoom-readout').textContent = Math.round(state.zoom * 100) + '%';
+}
+function fitCanvas() {
+  const wrap = document.getElementById('canvas-wrap');
+  if (!wrap.clientWidth) return;
+  const pad = 32;
+  state.zoom = Math.min((wrap.clientWidth - pad) / canvas.width, (wrap.clientHeight - pad) / canvas.height);
+  state.zoom = Math.min(state.zoom, 4);
+  state.pan = { x: 0, y: 0 };
+  applyTransform();
+}
+function zoom(factor) {
+  state.zoom = Math.max(0.1, Math.min(8, state.zoom * factor));
+  applyTransform();
+}
+function updateCursor() {
+  if (state.tool === 'pan') canvas.style.cursor = 'grab';
+  else if (state.tool === 'picker') canvas.style.cursor = 'copy';
+  else if (state.tool === 'fill') canvas.style.cursor = 'pointer';
+  else canvas.style.cursor = 'crosshair';
+}
+
+/* ============== Pointer Interaction ============== */
+const wrap = document.getElementById('canvas-wrap');
+let pointerState = null;
+
+function pointerToCell(e) {
+  const r = canvas.getBoundingClientRect();
+  // Convert client coords to canvas-internal pixels (account for CSS scaling)
+  const sx = canvas.width / r.width;
+  const sy = canvas.height / r.height;
+  const px = (e.clientX - r.left) * sx - AXIS_PX;
+  const py = (e.clientY - r.top) * sy - AXIS_PX;
+  if (px < 0 || py < 0) return null;
+  const x = Math.floor(px / CELL_PX);
+  const y = Math.floor(py / CELL_PX);
+  if (x < 0 || y < 0 || x >= state.size || y >= state.size) return null;
+  return [x, y];
+}
+
+function paintCell(x, y) {
+  const id = state.tool === 'eraser' ? null : state.selectedColorId;
+  if (state.grid[y][x] === id) return false;
+  state.grid[y][x] = id;
+  return true;
+}
+
+function fillBucket(x, y) {
+  const target = state.grid[y][x];
+  const replace = state.selectedColorId;
+  if (target === replace) return false;
+  const queue = [[x, y]];
+  let changed = false;
+  while (queue.length) {
+    const [cx, cy] = queue.pop();
+    if (cx < 0 || cy < 0 || cx >= state.size || cy >= state.size) continue;
+    if (state.grid[cy][cx] !== target) continue;
+    state.grid[cy][cx] = replace;
+    changed = true;
+    queue.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
+  }
+  return changed;
+}
+
+wrap.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  wrap.setPointerCapture(e.pointerId);
+  if (state.tool === 'pan' || e.button === 1 || e.shiftKey) {
+    pointerState = { mode: 'pan', startX: e.clientX, startY: e.clientY, panX: state.pan.x, panY: state.pan.y };
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+  const cell = pointerToCell(e);
+  if (!cell) return;
+  const [x, y] = cell;
+  if (state.tool === 'picker') {
+    const id = state.grid[y][x];
+    if (id) { state.selectedColorId = id; renderPalette(); }
+    state.tool = 'brush';
+    document.querySelectorAll('.tool[data-tool]').forEach(t => t.classList.toggle('active', t.dataset.tool === 'brush'));
+    updateCursor();
+    return;
+  }
+  if (state.tool === 'fill') {
+    if (fillBucket(x, y)) { pushHistory(); renderCanvas(); renderMaterials(); }
+    return;
+  }
+  // brush / eraser
+  pointerState = { mode: 'paint', changed: paintCell(x, y), lastCell: [x,y] };
+  if (pointerState.changed) renderCanvas();
+});
+wrap.addEventListener('pointermove', (e) => {
+  if (pointerState?.mode === 'pan') {
+    state.pan.x = pointerState.panX + (e.clientX - pointerState.startX);
+    state.pan.y = pointerState.panY + (e.clientY - pointerState.startY);
+    applyTransform();
+    return;
+  }
+  const cell = pointerToCell(e);
+  if (cell) {
+    const [x, y] = cell;
+    document.getElementById('hover-hint').style.display = 'block';
+    document.getElementById('hover-hint').textContent = `(${x+1}, ${y+1})${state.grid[y][x] ? ' · '+state.grid[y][x] : ''}`;
+    if (pointerState?.mode === 'paint') {
+      const [lx, ly] = pointerState.lastCell;
+      // Bresenham-ish line for fast drag
+      const steps = Math.max(Math.abs(x - lx), Math.abs(y - ly));
+      let any = false;
+      for (let i = 1; i <= steps; i++) {
+        const tx = Math.round(lx + (x - lx) * (i/steps));
+        const ty = Math.round(ly + (y - ly) * (i/steps));
+        if (paintCell(tx, ty)) any = true;
+      }
+      pointerState.lastCell = [x, y];
+      if (any) { pointerState.changed = true; renderCanvas(); }
+    }
+  } else {
+    document.getElementById('hover-hint').style.display = 'none';
+  }
+});
+wrap.addEventListener('pointerup', (e) => {
+  try { wrap.releasePointerCapture(e.pointerId); } catch(_) {}
+  if (pointerState?.mode === 'paint' && pointerState.changed) {
+    pushHistory();
+    renderMaterials();
+  }
+  pointerState = null;
+  updateCursor();
+});
+wrap.addEventListener('pointerleave', () => {
+  document.getElementById('hover-hint').style.display = 'none';
+});
+wrap.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  zoom(e.deltaY < 0 ? 1.1 : 0.9);
+}, { passive: false });
+
+/* Keyboard shortcuts */
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) { e.preventDefault(); redo(); }
+  else if (e.key === 'b') setTool('brush');
+  else if (e.key === 'e') setTool('eraser');
+  else if (e.key === 'g') setTool('fill');
+  else if (e.key === 'i') setTool('picker');
+  else if (e.key === 'h') setTool('pan');
+});
+function setTool(t) {
+  state.tool = t;
+  document.querySelectorAll('.tool[data-tool]').forEach(x => x.classList.toggle('active', x.dataset.tool === t));
+  updateCursor();
+}
+
+/* ============== Palette ============== */
+function renderPalette() {
+  const root = document.getElementById('palette');
+  root.innerHTML = '';
+  let totalCount = 0;
+  FAMILIES.forEach(({family, colors}, idx) => {
+    totalCount += colors.length;
+    const block = document.createElement('div');
+    block.className = 'family-block' + (idx < 2 ? ' open' : '');
+    block.dataset.family = family;
+    const head = document.createElement('div');
+    head.className = 'family-head';
+    const headLeft = document.createElement('div');
+    headLeft.className = 'l';
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = FAMILY_REP[family];
+    headLeft.appendChild(sw);
+    headLeft.appendChild(document.createTextNode(FAMILY_LABEL[family] || family));
+    const headRight = document.createElement('div');
+    headRight.className = 'fh-right';
+    const cnt = document.createElement('span');
+    cnt.className = 'count';
+    cnt.textContent = colors.length;
+    const caret = document.createElement('span');
+    caret.className = 'caret';
+    headRight.appendChild(cnt);
+    headRight.appendChild(caret);
+    head.appendChild(headLeft);
+    head.appendChild(headRight);
+    head.addEventListener('click', () => block.classList.toggle('open'));
+    block.appendChild(head);
+    const grid = document.createElement('div');
+    grid.className = 'family-grid';
+    colors.forEach(c => {
+      const dot = document.createElement('button');
+      dot.className = 'color-dot' + (family === 'special' ? ' special' : '') + (c.id === state.selectedColorId ? ' active' : '');
+      dot.style.background = c.hex;
+      if (family === 'special') dot.style.setProperty('--c', c.hex);
+      dot.title = `${c.id} · ${c.hex}`;
+      dot.addEventListener('click', () => {
+        state.selectedColorId = c.id;
+        renderPalette();
+      });
+      grid.appendChild(dot);
+    });
+    block.appendChild(grid);
+    root.appendChild(block);
+  });
+  document.getElementById('palette-count').textContent = totalCount + '色';
+}
+
+/* ============== Materials ============== */
+function tallyColors() {
+  const counts = new Map();
+  for (let y = 0; y < state.size; y++) {
+    for (let x = 0; x < state.size; x++) {
+      const id = state.grid[y][x];
+      if (!id) continue;
+      counts.set(id, (counts.get(id) || 0) + 1);
+    }
+  }
+  return [...counts.entries()].map(([id, n]) => ({ ...PALETTE_BY_ID[id], count: n }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function renderMaterials() {
+  const list = tallyColors();
+  const root = document.getElementById('material-list');
+  const total = list.reduce((s, c) => s + c.count, 0);
+  document.getElementById('total-beads').textContent = total + ' 颗';
+  if (list.length === 0) {
+    root.innerHTML = '<div class="empty-hint">还没放豆子，左侧选色后开始绘制吧～</div>';
+    return;
+  }
+  root.innerHTML = '';
+  list.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'material-item';
+    const il = document.createElement('div');
+    il.className = 'l';
+    const md = document.createElement('span');
+    md.className = 'mini-dot';
+    md.style.background = c.hex;
+    const lbl = document.createElement('span');
+    lbl.className = 'lbl';
+    lbl.textContent = c.id;
+    il.appendChild(md);
+    il.appendChild(lbl);
+    const qty = document.createElement('div');
+    qty.className = 'qty';
+    qty.textContent = '×' + c.count;
+    item.appendChild(il);
+    item.appendChild(qty);
+    root.appendChild(item);
+  });
+}
+
+/* ============== Export ============== */
+function renderExport() {
+  const exCanvas = document.getElementById('export-canvas');
+  const px = 22;
+  const W = state.size * px + AXIS_PX;
+  const H = state.size * px + AXIS_PX;
+  exCanvas.width = W;
+  exCanvas.height = H;
+  const ec = exCanvas.getContext('2d');
+  ec.fillStyle = '#ffffff';
+  ec.fillRect(0, 0, W, H);
+
+  const colorIndex = buildColorIndex();
+
+  // Pegboard guidelines (every 5)
+  ec.lineWidth = 0.5;
+  for (let i = 0; i <= state.size; i++) {
+    ec.strokeStyle = (i % 5 === 0) ? '#9ca3af' : '#e5e7eb';
+    ec.lineWidth = (i % 5 === 0) ? 0.8 : 0.4;
+    ec.beginPath();
+    ec.moveTo(AXIS_PX, AXIS_PX + i * px);
+    ec.lineTo(AXIS_PX + state.size * px, AXIS_PX + i * px);
+    ec.stroke();
+    ec.beginPath();
+    ec.moveTo(AXIS_PX + i * px, AXIS_PX);
+    ec.lineTo(AXIS_PX + i * px, AXIS_PX + state.size * px);
+    ec.stroke();
+  }
+
+  // Beads + numbers
+  for (let y = 0; y < state.size; y++) {
+    for (let x = 0; x < state.size; x++) {
+      const id = state.grid[y][x];
+      if (!id) continue;
+      const c = PALETTE_BY_ID[id];
+      const cx = AXIS_PX + x * px + px/2, cy = AXIS_PX + y * px + px/2;
+      drawBead(ec, cx, cy, px, c.hex, state.beadStyle, (y * state.size + x) * 1009 + 17);
+      ec.fillStyle = textColorOn(c.hex);
+      ec.font = `700 ${Math.floor(px * 0.45)}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+      ec.textAlign = 'center';
+      ec.textBaseline = 'middle';
+      ec.fillText(String(colorIndex.get(id) || ''), cx, cy + 0.5);
+    }
+  }
+  // 毛巾烫: global towel/parchment weave overlay
+  if (state.beadStyle === 'fluffy') drawFluffyOverlay(ec, W, H, px, AXIS_PX);
+  // outer pegboard frame
+  ec.strokeStyle = '#1f2937';
+  ec.lineWidth = 1.5;
+  ec.strokeRect(AXIS_PX, AXIS_PX, state.size * px, state.size * px);
+  // Axis labels
+  drawAxisLabels(ec, state.size, px, W, H);
+
+  document.getElementById('export-size').textContent = `尺寸 ${state.size}×${state.size}（约 ${(state.size * BEAD_MM / 10).toFixed(1)}×${(state.size * BEAD_MM / 10).toFixed(1)}cm）`;
+  const d = new Date();
+  document.getElementById('export-date').textContent = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+
+  // Compact 3-col legend (replaces the bulky table)
+  const legend = document.getElementById('export-legend');
+  legend.innerHTML = '';
+  const list = tallyColors().map(c => ({ ...c, n: colorIndex.get(c.id) || 0 }))
+    .sort((a, b) => a.n - b.n);
+  if (list.length === 0) {
+    legend.innerHTML = '<div class="leg-empty">画布还是空的</div>';
+  } else {
+    list.forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'leg-item';
+      const numEl = document.createElement('span');
+      numEl.className = 'leg-num';
+      numEl.style.background = c.hex;
+      numEl.style.color = textColorOn(c.hex);
+      numEl.textContent = String(c.n);
+      const idEl = document.createElement('span');
+      idEl.className = 'leg-id';
+      idEl.textContent = c.id;
+      const qtyEl = document.createElement('span');
+      qtyEl.className = 'leg-qty';
+      qtyEl.textContent = '×' + c.count;
+      item.appendChild(numEl);
+      item.appendChild(idEl);
+      item.appendChild(qtyEl);
+      legend.appendChild(item);
+    });
+  }
+  const total = list.reduce((s, c) => s + c.count, 0);
+  document.getElementById('export-total').textContent = total > 0
+    ? `共 ${list.length} 色 · ${total} 颗`
+    : '';
+}
+
+/* ============== Resize ============== */
+window.addEventListener('resize', () => { applyTransform(); });
+
+/* ============== Mobile Drawer ============== */
+const sidebar = document.querySelector('.sidebar');
+const drawerBackdrop = document.getElementById('drawer-backdrop');
+
+function openDrawer(tab = 'color') {
+  sidebar.classList.add('open');
+  sidebar.classList.remove('tab-color', 'tab-mat');
+  sidebar.classList.add('tab-' + tab);
+  document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('drawer-title').textContent = tab === 'color' ? '🎨 色卡库' : '📦 用料清单';
+  drawerBackdrop.classList.add('open');
+}
+function closeDrawer() {
+  sidebar.classList.remove('open');
+  drawerBackdrop.classList.remove('open');
+}
+document.getElementById('btn-show-panel')?.addEventListener('click', () => openDrawer('color'));
+document.getElementById('drawer-close')?.addEventListener('click', closeDrawer);
+drawerBackdrop.addEventListener('click', closeDrawer);
+document.querySelectorAll('.sidebar-tab').forEach(t => {
+  t.addEventListener('click', () => openDrawer(t.dataset.tab));
+});
+
+/* ============== Pinch Zoom (multi-touch) ============== */
+const activePointers = new Map();
+let pinchInitial = null; // { dist, zoom }
+
+wrap.addEventListener('pointerdown', (e) => {
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (activePointers.size === 2) {
+    pinchInitial = { dist: pinchDistance(), zoom: state.zoom };
+    pointerState = null; // cancel any paint
+  }
+}, true);
+wrap.addEventListener('pointermove', (e) => {
+  if (activePointers.has(e.pointerId)) {
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  }
+  if (pinchInitial && activePointers.size >= 2) {
+    const d = pinchDistance();
+    const ratio = d / pinchInitial.dist;
+    state.zoom = Math.max(0.1, Math.min(8, pinchInitial.zoom * ratio));
+    applyTransform();
+  }
+}, true);
+function clearPointer(e) {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) pinchInitial = null;
+}
+wrap.addEventListener('pointerup', clearPointer, true);
+wrap.addEventListener('pointercancel', clearPointer, true);
+wrap.addEventListener('pointerleave', clearPointer, true);
+
+function pinchDistance() {
+  const pts = [...activePointers.values()];
+  if (pts.length < 2) return 0;
+  const dx = pts[0].x - pts[1].x, dy = pts[0].y - pts[1].y;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
+/* ============== Boot ============== */
+initGrid(29);
+renderPalette();
+updateCursor();
+</script>
+</body>
+</html>
