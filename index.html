@@ -213,9 +213,6 @@
     margin-left: 1px;
     line-height: 1;
   }
-  .tool.icon-svg { color: var(--c-text); }
-  .tool.icon-svg svg { width: 20px; height: 20px; display: block; }
-  .tool.icon-svg.active { color: var(--c-primary); }
   .tool-spacer { flex: 1; }
   .tool-divider { width: 32px; height: 1px; background: var(--c-border); margin: 4px 0; }
 
@@ -1046,20 +1043,14 @@
       <button class="tool active" data-tool="brush" data-tip="画笔 (B)" data-tip-side="right">✏️</button>
       <button class="tool" data-tool="eraser" data-tip="橡皮 (E)" data-tip-side="right">🧽</button>
       <button class="tool" data-tool="fill" data-tip="油漆桶 (G)" data-tip-side="right">🪣</button>
-      <button class="tool icon-svg" data-tool="picker" data-tip="取色器 (I)" data-tip-side="right" aria-label="取色器">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>
-      </button>
+      <button class="tool" data-tool="picker" data-tip="取色器 (I)" data-tip-side="right">💉</button>
       <div class="tool-divider"></div>
       <button class="tool" data-tool="pan" data-tip="平移 (H/空格)" data-tip-side="right">🖐️</button>
       <button class="tool tool-zoom" data-act="zoom-in" data-tip="放大" data-tip-side="right">🔍<span class="zsign">+</span></button>
       <button class="tool tool-zoom" data-act="zoom-out" data-tip="缩小" data-tip-side="right">🔍<span class="zsign">−</span></button>
-      <button class="tool icon-svg" data-act="fit" data-tip="适配窗口" data-tip-side="right" aria-label="适配窗口">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4"/><path d="M20 9V5a1 1 0 0 0-1-1h-4"/><path d="M4 15v4a1 1 0 0 0 1 1h4"/><path d="M20 15v4a1 1 0 0 1-1 1h-4"/></svg>
-      </button>
+      <button class="tool" data-act="fit" data-tip="适配窗口" data-tip-side="right">🪟</button>
       <div class="tool-divider"></div>
-      <button class="tool icon-svg" data-act="outline" data-tip="一键描边" data-tip-side="right" aria-label="一键描边">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="2 2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
-      </button>
+      <button class="tool" data-act="outline" data-tip="一键描边" data-tip-side="right">🔲</button>
       <div class="tool-spacer"></div>
     </div>
 
@@ -2460,24 +2451,16 @@ function zoom(factor) {
 /* Emoji-SVG cursors that follow the active tool. Encoded as data URIs so we
    don't ship asset files; hotspot picked to feel natural for each gesture. */
 function buildEmojiCursor(emoji, hotX, hotY) {
-  // 32x32 SVG with the emoji centered. Foreground is rendered as system emoji
-  // (the user's OS font), so this stays consistent with toolbar icons.
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><text x="16" y="24" font-size="22" text-anchor="middle" font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif">${emoji}</text></svg>`;
-  return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${hotX} ${hotY}, auto`;
-}
-function buildSvgCursor(innerSvg, hotX, hotY) {
-  // Line-art SVG cursor for tools that don't have a clear emoji equivalent.
-  // Must encodeURIComponent — otherwise embedded `"` and `#` in the SVG break
-  // the outer cursor: url("...") string and the cursor silently falls back.
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ff8fab" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${innerSvg}</svg>`;
+  // 24x24 SVG with the emoji centered. Smaller than 32x32 so the cursor
+  // doesn't dominate the canvas.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><text x="12" y="20" font-size="18" text-anchor="middle" font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif">${emoji}</text></svg>`;
   return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${hotX} ${hotY}, auto`;
 }
 const TOOL_CURSORS = {
-  brush:  buildEmojiCursor('✏️', 4, 28),   // tip = bottom-left
-  eraser: buildEmojiCursor('🧽', 8, 24),
-  fill:   buildEmojiCursor('🪣', 6, 26),
-  // Eyedropper: tip at bottom-left of the icon
-  picker: buildSvgCursor('<path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/>', 2, 30),
+  brush:  buildEmojiCursor('✏️', 3, 21),   // tip = bottom-left
+  eraser: buildEmojiCursor('🧽', 6, 18),
+  fill:   buildEmojiCursor('🪣', 5, 20),
+  picker: buildEmojiCursor('💉', 5, 20),
   pan:    'grab',
 };
 function updateCursor() {
