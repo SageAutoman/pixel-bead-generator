@@ -2136,15 +2136,35 @@ function reducePaletteToTopN(grid, size, n) {
 /* ============== ML Background Removal (@imgly) ============== */
 let imglyLib = null;
 let imglyLoading = null;
+const IMGLY_VERSION = '1.7.0';
+// Try ESM CDNs in order. esm.sh resolves peer deps (onnxruntime-web) more
+// reliably than jsdelivr's +esm path; jsdelivr is the fallback if esm.sh
+// is reachable but slow/down.
+const IMGLY_CDN_URLS = [
+  `https://esm.sh/@imgly/background-removal@${IMGLY_VERSION}?bundle`,
+  `https://cdn.jsdelivr.net/npm/@imgly/background-removal@${IMGLY_VERSION}/+esm`,
+];
 async function ensureImgly(onProgress) {
   if (imglyLib) return imglyLib;
   if (imglyLoading) return imglyLoading;
   imglyLoading = (async () => {
     if (onProgress) onProgress('script', 0);
-    // ESM CDN — module is small, model assets are fetched on first call.
-    const mod = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.6.0/+esm');
-    imglyLib = mod;
-    return mod;
+    let lastErr = null;
+    for (const url of IMGLY_CDN_URLS) {
+      try {
+        console.log('[ML] trying', url);
+        const mod = await import(/* @vite-ignore */ url);
+        const removeFn = mod.removeBackground || mod.default?.removeBackground;
+        if (typeof removeFn !== 'function') throw new Error('removeBackground export missing');
+        imglyLib = { removeBackground: removeFn, _src: url };
+        console.log('[ML] loaded from', url);
+        return imglyLib;
+      } catch (e) {
+        console.warn('[ML] cdn failed', url, e);
+        lastErr = e;
+      }
+    }
+    throw new Error('所有 CDN 都加载失败: ' + (lastErr?.message || lastErr));
   })();
   return imglyLoading;
 }
@@ -2159,7 +2179,9 @@ async function mlRemoveBackground(srcImg, onProgress) {
   canvas.width = Math.max(1, Math.round(sw * scale));
   canvas.height = Math.max(1, Math.round(sh * scale));
   canvas.getContext('2d').drawImage(srcImg, 0, 0, canvas.width, canvas.height);
+  // 'small' model is ~10MB instead of ~80MB for isnet — friendlier first-run.
   const blob = await lib.removeBackground(canvas, {
+    model: 'small',
     output: { format: 'image/png', quality: 0.9 },
     progress: (key, current, total) => {
       if (onProgress) onProgress(key, total > 0 ? current / total : 0);
@@ -2407,7 +2429,11 @@ async function runComparison() {
       if (progressText) progressText.textContent = '100%';
     } catch (err) {
       console.warn('ML bg removal failed, falling back to heuristic', err);
-      showToast('AI 抠图未能加载，已回退到启发式抠图', 'warn');
+      const reason = (err && err.message) ? err.message : String(err);
+      const short = reason.length > 80 ? reason.slice(0, 80) + '...' : reason;
+      showToast('AI 抠图失败，回退启发式 · ' + short, 'warn');
+      // Also update loading text so the failure is visible if toast was missed.
+      if (loadingTextEl) loadingTextEl.textContent = '⚠️ AI 抠图: ' + short;
     }
     if (progressWrap) progressWrap.hidden = true;
   }
