@@ -502,6 +502,42 @@
   }
   .bs-btn.active span { color: white; }
 
+  /* Fullscreen loader: blocks input, communicates a heavy op is running. */
+  .full-loader {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadein 0.15s ease-out;
+  }
+  .full-loader[hidden] { display: none; }
+  .full-loader-card {
+    background: var(--c-paper);
+    border-radius: 14px;
+    padding: 24px 32px;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    min-width: 220px;
+  }
+  .full-loader-spin {
+    width: 40px; height: 40px;
+    border: 3px solid var(--c-border);
+    border-top-color: var(--c-primary);
+    border-radius: 50%;
+    margin: 0 auto 14px;
+    animation: spin 0.8s linear infinite;
+  }
+  .full-loader-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c-text);
+  }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+
   /* Outline popover (designer spec) */
   .outline-pop {
     position: fixed;
@@ -1298,9 +1334,9 @@
         <input type="file" id="upload-input" accept="image/*" hidden />
       </div>
       <div class="size-row">
-        <button class="size-btn" data-size="16"><span class="n">16²</span><span class="lbl">~4cm</span></button>
-        <button class="size-btn active" data-size="29"><span class="n">29²</span><span class="lbl">~7.5cm</span></button>
-        <button class="size-btn" data-size="50"><span class="n">50²</span><span class="lbl">~13cm</span></button>
+        <button class="size-btn" data-size="29"><span class="n">29²</span><span class="lbl">~7.5cm</span></button>
+        <button class="size-btn active" data-size="38"><span class="n">38²</span><span class="lbl">~10cm</span></button>
+        <button class="size-btn" data-size="48"><span class="n">48²</span><span class="lbl">~12.5cm</span></button>
         <button class="size-btn" data-size="58"><span class="n">58²</span><span class="lbl">~15cm</span></button>
       </div>
       <button class="start-btn" id="btn-blank">🎨 创建空白画布</button>
@@ -1411,9 +1447,9 @@
       <div class="sb-section">
         <div class="sb-title"><span>📐 画板大小</span><span id="size-source-hint" style="color:var(--c-text-3);font-weight:500;font-size:10px"></span></div>
         <div class="size-row" id="editor-size-row">
-          <button class="size-btn" data-size="16"><span class="n">16²</span><span class="lbl">~4cm</span></button>
-          <button class="size-btn active" data-size="29"><span class="n">29²</span><span class="lbl">~7.5cm</span></button>
-          <button class="size-btn" data-size="50"><span class="n">50²</span><span class="lbl">~13cm</span></button>
+          <button class="size-btn" data-size="29"><span class="n">29²</span><span class="lbl">~7.5cm</span></button>
+          <button class="size-btn active" data-size="38"><span class="n">38²</span><span class="lbl">~10cm</span></button>
+          <button class="size-btn" data-size="48"><span class="n">48²</span><span class="lbl">~12.5cm</span></button>
           <button class="size-btn" data-size="58"><span class="n">58²</span><span class="lbl">~15cm</span></button>
         </div>
       </div>
@@ -1461,6 +1497,14 @@
 </div>
 
 <div class="drawer-backdrop" id="drawer-backdrop"></div>
+
+<!-- Fullscreen loader for heavy ops (size change, etc.) -->
+<div class="full-loader" id="full-loader" hidden>
+  <div class="full-loader-card">
+    <div class="full-loader-spin"></div>
+    <div class="full-loader-text" id="full-loader-text">正在重置画板...</div>
+  </div>
+</div>
 
 <!-- Outline Popover -->
 <div class="outline-pop" id="outline-pop">
@@ -1769,35 +1813,62 @@ function syncEditorSizeUI() {
   const hint = document.getElementById('size-source-hint');
   if (hint) hint.textContent = state.sourceImage ? '改尺寸将重新像素化' : '';
 }
-function changeEditorSize(newSize) {
+function showFullLoader(msg) {
+  const el = document.getElementById('full-loader');
+  const txt = document.getElementById('full-loader-text');
+  if (txt) txt.textContent = msg || '处理中...';
+  if (el) el.hidden = false;
+}
+function hideFullLoader() {
+  const el = document.getElementById('full-loader');
+  if (el) el.hidden = true;
+}
+// Yield to the browser so the loader actually paints before heavy sync work.
+function yieldFrame() {
+  return new Promise(r => setTimeout(r, 16));
+}
+
+async function changeEditorSize(newSize) {
   if (newSize === state.size) return;
-  if (state.sourceImage) {
-    // Re-pixelate from original image with same style choice
-    const img = state.sourceImage;
-    const bgRemove = !!state.sourceBgRemove;
-    const mode = state.sourceMode || 'realistic';
-    const grid = mode === 'cute'
-      ? generateCute(img, newSize, bgRemove)
-      : generateRealistic(img, newSize, bgRemove);
-    state.size = newSize;
-    state.grid = grid;
-    state.history = [cloneGrid(grid)];
-    state.historyIdx = 0;
-    document.getElementById('m-size').textContent = `${newSize}×${newSize}`;
-    fitCanvas();
-    renderCanvas();
-    renderMaterials();
-    refreshActionBar();
-  } else {
-    // No source image — confirm before wiping the blank/edited grid
-    const hasContent = state.grid.some(row => row.some(c => c));
-    if (hasContent && !confirm(`改成 ${newSize}×${newSize} 会清空当前图纸，确认？`)) {
-      syncEditorSizeUI();
-      return;
-    }
-    initGrid(newSize);
+  // For larger boards (≥48), show a blocking loader so the UI doesn't look
+  // dead while we re-pixelate or rebuild the grid.
+  const heavy = newSize >= 48 || (state.sourceImage && newSize >= 38);
+  if (heavy) {
+    showFullLoader(state.sourceImage
+      ? `正在按 ${newSize}×${newSize} 重新像素化...`
+      : `正在重置画板为 ${newSize}×${newSize}...`);
+    await yieldFrame();
   }
-  syncEditorSizeUI();
+  try {
+    if (state.sourceImage) {
+      const img = state.sourceImage;
+      const bgRemove = !!state.sourceBgRemove;
+      const mode = state.sourceMode || 'realistic';
+      const grid = mode === 'cute'
+        ? generateCute(img, newSize, bgRemove)
+        : generateRealistic(img, newSize, bgRemove);
+      state.size = newSize;
+      state.grid = grid;
+      state.history = [cloneGrid(grid)];
+      state.historyIdx = 0;
+      document.getElementById('m-size').textContent = `${newSize}×${newSize}`;
+      if (heavy) await yieldFrame();
+      fitCanvas();
+      renderCanvas();
+      renderMaterials();
+      refreshActionBar();
+    } else {
+      const hasContent = state.grid.some(row => row.some(c => c));
+      if (hasContent && !confirm(`改成 ${newSize}×${newSize} 会清空当前图纸，确认？`)) {
+        syncEditorSizeUI();
+        return;
+      }
+      initGrid(newSize);
+    }
+    syncEditorSizeUI();
+  } finally {
+    hideFullLoader();
+  }
 }
 document.querySelectorAll('#editor-size-row .size-btn').forEach(b => {
   b.addEventListener('click', () => {
@@ -1818,7 +1889,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 document.getElementById('btn-go-export').addEventListener('click', () => switchView('export'));
 
 /* ============== Landing Actions ============== */
-let landingSize = 29;
+let landingSize = 38;
 
 /* Lightweight transient toast (top-center, auto-dismiss). */
 function showToast(msg, kind) {
@@ -2344,7 +2415,7 @@ function estimateComplexity(img) {
 function suggestUpSize(complexity, currentSize) {
   if (currentSize >= 58) return null;
   if (complexity > 70 && currentSize < 58) return 58;
-  if (complexity > 40 && currentSize < 50) return 50;
+  if (complexity > 40 && currentSize < 48) return 48;
   return null;
 }
 
@@ -2412,19 +2483,27 @@ async function runComparison() {
   if (useML) {
     if (loadingTextEl) loadingTextEl.textContent = '🧠 AI 抠图模型加载中...（首次约 30s）';
     if (progressWrap) progressWrap.hidden = false;
+    if (progressFill) progressFill.style.width = '0%';
+    if (progressText) progressText.textContent = '0%';
     try {
+      const phaseLabel = (key) => {
+        if (!key) return '🧠 AI 抠图中...';
+        if (key === 'script' || key.startsWith('fetch')) return '📥 下载 AI 模型中...';
+        if (key === 'compute:decode') return '🖼️ 解码原图...';
+        if (key === 'compute:inference') return '🧠 AI 推理中（发丝级）...';
+        if (key === 'compute:mask') return '✂️ 应用前景蒙版...';
+        if (key === 'compute:encode') return '📦 编码输出 PNG...';
+        return '🧠 ' + key;
+      };
       let lastKey = '';
       const masked = await mlRemoveBackground(pendingImg, (key, ratio) => {
         if (key !== lastKey) {
           lastKey = key;
-          if (loadingTextEl) {
-            loadingTextEl.textContent = key === 'fetch' || key === 'script'
-              ? '🧠 下载 AI 模型中...'
-              : '🧠 AI 抠图运算中...';
-          }
+          if (loadingTextEl) loadingTextEl.textContent = phaseLabel(key);
         }
-        if (progressFill) progressFill.style.width = (Math.max(0, Math.min(1, ratio)) * 100).toFixed(0) + '%';
-        if (progressText) progressText.textContent = (Math.max(0, Math.min(1, ratio)) * 100).toFixed(0) + '%';
+        const pct = (Math.max(0, Math.min(1, ratio)) * 100).toFixed(0);
+        if (progressFill) progressFill.style.width = pct + '%';
+        if (progressText) progressText.textContent = pct + '%';
       });
       workImg = masked;
       bgAlreadyRemoved = true;
@@ -3717,7 +3796,7 @@ function pinchDistance() {
 }
 
 /* ============== Boot ============== */
-initGrid(29);
+initGrid(38);
 renderPalette();
 updateCursor();
 refreshBrushSizeGroup();
