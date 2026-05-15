@@ -316,7 +316,41 @@
     font-size: 11px;
     color: var(--c-text-2);
     font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, border-color 0.12s;
   }
+  .zoom-readout:hover { background: var(--c-toolbar-bg); border-color: var(--c-primary); color: var(--c-text); }
+  .zoom-popover {
+    position: absolute;
+    bottom: 44px;
+    left: 12px;
+    background: var(--c-paper);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    padding: 4px;
+    display: none;
+    flex-direction: column;
+    min-width: 96px;
+    z-index: 40;
+  }
+  .zoom-popover.open { display: flex; }
+  .zoom-popover button {
+    background: transparent;
+    border: none;
+    text-align: left;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--c-text);
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+  }
+  .zoom-popover button:hover { background: var(--c-toolbar-bg); }
+  .zoom-popover button.current { color: var(--c-primary); font-weight: 600; }
+  .zoom-popover hr { border: none; border-top: 1px solid var(--c-border); margin: 4px 0; }
   .hover-hint {
     position: absolute;
     top: 12px;
@@ -1046,9 +1080,9 @@
       <button class="tool" data-tool="picker" data-tip="取色器 (I)" data-tip-side="right">💉</button>
       <div class="tool-divider"></div>
       <button class="tool" data-tool="pan" data-tip="平移 (H/空格)" data-tip-side="right">🖐️</button>
-      <button class="tool tool-zoom" data-act="zoom-in" data-tip="放大" data-tip-side="right">🔍<span class="zsign">+</span></button>
-      <button class="tool tool-zoom" data-act="zoom-out" data-tip="缩小" data-tip-side="right">🔍<span class="zsign">−</span></button>
-      <button class="tool" data-act="fit" data-tip="适配窗口" data-tip-side="right">🪟</button>
+      <button class="tool tool-zoom" data-act="zoom-in" data-tip="放大 (+)" data-tip-side="right">🔍<span class="zsign">+</span></button>
+      <button class="tool tool-zoom" data-act="zoom-out" data-tip="缩小 (−)" data-tip-side="right">🔍<span class="zsign">−</span></button>
+      <button class="tool" data-act="fit" data-tip="适配窗口 (0)" data-tip-side="right">🪟</button>
       <div class="tool-divider"></div>
       <button class="tool" data-act="outline" data-tip="一键描边" data-tip-side="right">🔲</button>
       <div class="tool-spacer"></div>
@@ -1081,7 +1115,18 @@
       </div>
       <div class="canvas-wrap" id="canvas-wrap">
         <canvas id="canvas"></canvas>
-        <div class="zoom-readout" id="zoom-readout">100%</div>
+        <div class="zoom-readout" id="zoom-readout" data-tip="点击切换缩放比例 (0=适配 / 1=100%)" data-tip-side="top">100%</div>
+        <div class="zoom-popover" id="zoom-popover" role="menu">
+          <button data-zoom-preset="0.25">25%</button>
+          <button data-zoom-preset="0.5">50%</button>
+          <button data-zoom-preset="0.75">75%</button>
+          <button data-zoom-preset="1">100%</button>
+          <button data-zoom-preset="1.5">150%</button>
+          <button data-zoom-preset="2">200%</button>
+          <button data-zoom-preset="4">400%</button>
+          <hr/>
+          <button data-zoom-preset="fit">适配窗口</button>
+        </div>
         <div class="hover-hint" id="hover-hint"></div>
       </div>
     </div>
@@ -2433,7 +2478,14 @@ function applyTransform() {
   canvas.style.height = ch + 'px';
   canvas.style.left = (w/2 - cw/2 + state.pan.x) + 'px';
   canvas.style.top = (h/2 - ch/2 + state.pan.y) + 'px';
-  document.getElementById('zoom-readout').textContent = Math.round(state.zoom * 100) + '%';
+  const readout = document.getElementById('zoom-readout');
+  if (readout) readout.textContent = Math.round(state.zoom * 100) + '%';
+  // Highlight matching preset in popover.
+  document.querySelectorAll('#zoom-popover [data-zoom-preset]').forEach(b => {
+    const v = b.dataset.zoomPreset;
+    if (v === 'fit') return;
+    b.classList.toggle('current', Math.abs(state.zoom - parseFloat(v)) < 0.01);
+  });
 }
 function fitCanvas() {
   const wrap = document.getElementById('canvas-wrap');
@@ -2444,9 +2496,36 @@ function fitCanvas() {
   state.pan = { x: 0, y: 0 };
   applyTransform();
 }
-function zoom(factor) {
-  state.zoom = Math.max(0.1, Math.min(8, state.zoom * factor));
+/* setZoom keeps the cursor (or wrap-center if no anchor given) pinned to the
+   same source pixel as zoom changes. This is the difference between "feels
+   right" and "jumps around" zoom UX. */
+function setZoom(newZoom, anchorClientX, anchorClientY) {
+  newZoom = Math.max(0.1, Math.min(8, newZoom));
+  const wrap = document.getElementById('canvas-wrap');
+  const r = wrap.getBoundingClientRect();
+  const w = r.width, h = r.height;
+  const z0 = state.zoom;
+  if (Math.abs(newZoom - z0) < 1e-6) return;
+  const cw0 = canvas.width * z0;
+  const ch0 = canvas.height * z0;
+  const left0 = w / 2 - cw0 / 2 + state.pan.x;
+  const top0 = h / 2 - ch0 / 2 + state.pan.y;
+  const ax = (anchorClientX !== undefined) ? (anchorClientX - r.left) : w / 2;
+  const ay = (anchorClientY !== undefined) ? (anchorClientY - r.top)  : h / 2;
+  // Source pixel under anchor at z0:
+  const srcX = (ax - left0) / z0;
+  const srcY = (ay - top0) / z0;
+  state.zoom = newZoom;
+  const cw1 = canvas.width * newZoom;
+  const ch1 = canvas.height * newZoom;
+  const left1 = ax - srcX * newZoom;
+  const top1  = ay - srcY * newZoom;
+  state.pan.x = left1 - w / 2 + cw1 / 2;
+  state.pan.y = top1  - h / 2 + ch1 / 2;
   applyTransform();
+}
+function zoom(factor, anchorClientX, anchorClientY) {
+  setZoom(state.zoom * factor, anchorClientX, anchorClientY);
 }
 /* Emoji-SVG cursors that follow the active tool. Encoded as data URIs so we
    don't ship asset files; hotspot picked to feel natural for each gesture. */
@@ -2579,8 +2658,30 @@ wrap.addEventListener('pointerleave', () => {
 });
 wrap.addEventListener('wheel', (e) => {
   e.preventDefault();
-  zoom(e.deltaY < 0 ? 1.1 : 0.9);
+  zoom(e.deltaY < 0 ? 1.1 : 0.9, e.clientX, e.clientY);
 }, { passive: false });
+
+/* Zoom popover (click readout to open, click preset / outside to close). */
+(function setupZoomPopover() {
+  const readout = document.getElementById('zoom-readout');
+  const pop = document.getElementById('zoom-popover');
+  if (!readout || !pop) return;
+  readout.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pop.classList.toggle('open');
+  });
+  pop.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-zoom-preset]');
+    if (!btn) return;
+    const v = btn.dataset.zoomPreset;
+    if (v === 'fit') fitCanvas();
+    else setZoom(parseFloat(v));
+    pop.classList.remove('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (!pop.contains(e.target) && e.target !== readout) pop.classList.remove('open');
+  });
+})();
 
 /* Keyboard shortcuts */
 window.addEventListener('keydown', (e) => {
@@ -2592,6 +2693,10 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'g') setTool('fill');
   else if (e.key === 'i') setTool('picker');
   else if (e.key === 'h') setTool('pan');
+  else if (e.key === '0') { e.preventDefault(); fitCanvas(); }
+  else if (e.key === '1') { e.preventDefault(); setZoom(1); }
+  else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoom(1.25); }
+  else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoom(0.8); }
 });
 function setTool(t) {
   state.tool = t;
