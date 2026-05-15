@@ -601,6 +601,89 @@
     font-family: inherit;
     font-size: 12px;
   }
+  .palette-search {
+    margin-top: 8px;
+    position: relative;
+  }
+  .palette-search input {
+    width: 100%;
+    padding: 7px 28px 7px 10px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    background: var(--c-paper);
+    color: var(--c-text);
+    font-family: inherit;
+    font-size: 12px;
+  }
+  .palette-search input:focus {
+    outline: none;
+    border-color: var(--c-primary);
+    box-shadow: 0 0 0 2px rgba(255, 143, 171, 0.2);
+  }
+  .palette-search input::-webkit-search-cancel-button { display: none; }
+  .palette-search-clear {
+    position: absolute;
+    right: 6px; top: 50%;
+    transform: translateY(-50%);
+    width: 20px; height: 20px;
+    background: transparent;
+    border: none;
+    color: var(--c-text-3);
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .palette-search-clear:hover { background: var(--c-toolbar-bg); color: var(--c-text); }
+  .used-block {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: rgba(255, 143, 171, 0.08);
+    border: 1px solid rgba(255, 143, 171, 0.25);
+    border-radius: var(--r-sm);
+  }
+  .used-block .used-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--c-secondary);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .used-block .used-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 26px);
+    gap: 6px;
+  }
+  .used-block .used-dot {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--c-border);
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.1s;
+  }
+  .used-block .used-dot:hover { transform: scale(1.15); }
+  .used-block .used-dot.active { box-shadow: 0 0 0 2px var(--c-secondary); }
+  .used-block .used-dot::after {
+    content: attr(data-count);
+    position: absolute;
+    bottom: -7px; right: -4px;
+    background: var(--c-secondary);
+    color: #fff;
+    font-size: 9px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 8px;
+    pointer-events: none;
+    font-weight: 600;
+  }
+  .palette-empty {
+    text-align: center;
+    padding: 24px 12px;
+    color: var(--c-text-3);
+    font-size: 12px;
+  }
   .palette-scroll {
     flex: 1;
     overflow-y: auto;
@@ -1293,6 +1376,10 @@
           <option value="Hama">Hama Midi（即将上线，等官方色卡接入）</option>
           <option value="Perler">Perler（即将上线，等官方色卡接入）</option>
         </select>
+        <div class="palette-search">
+          <input type="search" id="palette-search-input" placeholder="搜色号 / 色名 / hex" autocomplete="off" />
+          <button class="palette-search-clear" id="palette-search-clear" type="button" hidden aria-label="清空">✕</button>
+        </div>
       </div>
       <div class="palette-scroll" id="palette"></div>
       <div class="materials">
@@ -1596,14 +1683,14 @@ function undo() {
   if (state.historyIdx <= 0) return;
   state.historyIdx--;
   state.grid = cloneGrid(state.history[state.historyIdx]);
-  renderCanvas(); renderMaterials(); refreshActionBar();
+  renderCanvas(); renderMaterials(); renderPalette(); refreshActionBar();
   scheduleDraftSave();
 }
 function redo() {
   if (state.historyIdx >= state.history.length - 1) return;
   state.historyIdx++;
   state.grid = cloneGrid(state.history[state.historyIdx]);
-  renderCanvas(); renderMaterials(); refreshActionBar();
+  renderCanvas(); renderMaterials(); renderPalette(); refreshActionBar();
   scheduleDraftSave();
 }
 function refreshActionBar() {
@@ -2449,7 +2536,7 @@ document.getElementById('btn-new').addEventListener('click', () => {
   if (confirm('新建会清空当前图纸，确认？')) { initGrid(state.size); clearDraft(); }
 });
 document.getElementById('btn-clear').addEventListener('click', () => {
-  if (confirm('清空当前画布？')) { state.grid = makeGrid(state.size); pushHistory(); renderCanvas(); renderMaterials(); }
+  if (confirm('清空当前画布？')) { state.grid = makeGrid(state.size); pushHistory(); renderCanvas(); renderMaterials(); renderPalette(); }
 });
 document.getElementById('btn-flip-h').addEventListener('click', () => {
   if (!state.grid) return;
@@ -2870,7 +2957,7 @@ wrap.addEventListener('pointerdown', (e) => {
     return;
   }
   if (state.tool === 'fill') {
-    if (fillBucket(x, y)) { pushHistory(); renderCanvas(); renderMaterials(); }
+    if (fillBucket(x, y)) { pushHistory(); renderCanvas(); renderMaterials(); renderPalette(); }
     return;
   }
   // brush / eraser
@@ -2911,6 +2998,7 @@ wrap.addEventListener('pointerup', (e) => {
   if (pointerState?.mode === 'paint' && pointerState.changed) {
     pushHistory();
     renderMaterials();
+    renderPalette();  // refresh "used colors" block + selected highlight
   }
   pointerState = null;
   updateCursor();
@@ -2985,14 +3073,60 @@ function setTool(t) {
 }
 
 /* ============== Palette ============== */
+let paletteSearchQuery = '';
 function renderPalette() {
   const root = document.getElementById('palette');
   root.innerHTML = '';
+  const q = paletteSearchQuery.trim().toLowerCase();
   let totalCount = 0;
+  let visibleCount = 0;
+
+  // 1) "Used colors" block (sorted by frequency desc) — only when grid has paint.
+  const usedCounts = tallyColors();
+  const usedSorted = Array.from(usedCounts.entries())
+    .map(([id, count]) => ({ id, count, color: PALETTE_BY_ID[id] }))
+    .filter(x => x.color)
+    .sort((a, b) => b.count - a.count);
+  if (usedSorted.length > 0 && !q) {
+    const block = document.createElement('div');
+    block.className = 'used-block';
+    const ttl = document.createElement('div');
+    ttl.className = 'used-title';
+    ttl.innerHTML = `<span>📌 已用 ${usedSorted.length} 色 · 按用量排序</span>`;
+    block.appendChild(ttl);
+    const grid = document.createElement('div');
+    grid.className = 'used-grid';
+    usedSorted.forEach(({ id, count, color }) => {
+      const dot = document.createElement('button');
+      dot.className = 'used-dot' + (id === state.selectedColorId ? ' active' : '');
+      dot.style.background = color.hex;
+      dot.dataset.count = count;
+      dot.title = `${color.id} · ${color.hex} · ${count} 颗`;
+      dot.addEventListener('click', () => {
+        state.selectedColorId = id;
+        renderPalette();
+      });
+      grid.appendChild(dot);
+    });
+    block.appendChild(grid);
+    root.appendChild(block);
+  }
+
+  // 2) Family blocks, optionally filtered by search query.
+  function colorMatches(c) {
+    if (!q) return true;
+    return c.id.toLowerCase().includes(q)
+        || (c.hex || '').toLowerCase().includes(q)
+        || (c.name || '').toLowerCase().includes(q);
+  }
   FAMILIES.forEach(({family, colors}, idx) => {
     totalCount += colors.length;
+    const filtered = q ? colors.filter(colorMatches) : colors;
+    if (filtered.length === 0) return;
+    visibleCount += filtered.length;
     const block = document.createElement('div');
-    block.className = 'family-block' + (idx < 2 ? ' open' : '');
+    // When searching, force-open all matching family blocks for visibility.
+    block.className = 'family-block' + (q || idx < 2 ? ' open' : '');
     block.dataset.family = family;
     const head = document.createElement('div');
     head.className = 'family-head';
@@ -3007,7 +3141,7 @@ function renderPalette() {
     headRight.className = 'fh-right';
     const cnt = document.createElement('span');
     cnt.className = 'count';
-    cnt.textContent = colors.length;
+    cnt.textContent = q ? `${filtered.length}/${colors.length}` : colors.length;
     const caret = document.createElement('span');
     caret.className = 'caret';
     headRight.appendChild(cnt);
@@ -3018,7 +3152,7 @@ function renderPalette() {
     block.appendChild(head);
     const grid = document.createElement('div');
     grid.className = 'family-grid';
-    colors.forEach(c => {
+    filtered.forEach(c => {
       const dot = document.createElement('button');
       dot.className = 'color-dot' + (family === 'special' ? ' special' : '') + (c.id === state.selectedColorId ? ' active' : '');
       dot.style.background = c.hex;
@@ -3033,7 +3167,16 @@ function renderPalette() {
     block.appendChild(grid);
     root.appendChild(block);
   });
-  document.getElementById('palette-count').textContent = totalCount + '色';
+
+  if (q && visibleCount === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'palette-empty';
+    empty.textContent = `没有找到 "${q}" 匹配的颜色`;
+    root.appendChild(empty);
+  }
+  document.getElementById('palette-count').textContent = q
+    ? `${visibleCount}/${totalCount}色`
+    : totalCount + '色';
 }
 
 /* ============== Materials ============== */
@@ -3245,6 +3388,27 @@ initGrid(29);
 renderPalette();
 updateCursor();
 refreshBrushSizeGroup();
+
+// Palette search wiring.
+(function setupPaletteSearch() {
+  const input = document.getElementById('palette-search-input');
+  const clear = document.getElementById('palette-search-clear');
+  if (!input || !clear) return;
+  let debounce = null;
+  input.addEventListener('input', (e) => {
+    paletteSearchQuery = e.target.value || '';
+    clear.hidden = !paletteSearchQuery;
+    clearTimeout(debounce);
+    debounce = setTimeout(() => renderPalette(), 60);
+  });
+  clear.addEventListener('click', () => {
+    input.value = '';
+    paletteSearchQuery = '';
+    clear.hidden = true;
+    renderPalette();
+    input.focus();
+  });
+})();
 
 // Draft restore banner.
 (function setupDraftBanner() {
