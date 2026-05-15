@@ -1047,18 +1047,18 @@
       <button class="tool" data-tool="eraser" data-tip="橡皮 (E)" data-tip-side="right">🧽</button>
       <button class="tool" data-tool="fill" data-tip="油漆桶 (G)" data-tip-side="right">🪣</button>
       <button class="tool icon-svg" data-tool="picker" data-tip="取色器 (I)" data-tip-side="right" aria-label="取色器">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>
       </button>
       <div class="tool-divider"></div>
       <button class="tool" data-tool="pan" data-tip="平移 (H/空格)" data-tip-side="right">🖐️</button>
       <button class="tool tool-zoom" data-act="zoom-in" data-tip="放大" data-tip-side="right">🔍<span class="zsign">+</span></button>
       <button class="tool tool-zoom" data-act="zoom-out" data-tip="缩小" data-tip-side="right">🔍<span class="zsign">−</span></button>
       <button class="tool icon-svg" data-act="fit" data-tip="适配窗口" data-tip-side="right" aria-label="适配窗口">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4"/><path d="M20 9V5a1 1 0 0 0-1-1h-4"/><path d="M4 15v4a1 1 0 0 0 1 1h4"/><path d="M20 15v4a1 1 0 0 1-1 1h-4"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4"/><path d="M20 9V5a1 1 0 0 0-1-1h-4"/><path d="M4 15v4a1 1 0 0 0 1 1h4"/><path d="M20 15v4a1 1 0 0 1-1 1h-4"/></svg>
       </button>
       <div class="tool-divider"></div>
       <button class="tool icon-svg" data-act="outline" data-tip="一键描边" data-tip-side="right" aria-label="一键描边">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="2 2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="2 2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
       </button>
       <div class="tool-spacer"></div>
     </div>
@@ -2467,8 +2467,10 @@ function buildEmojiCursor(emoji, hotX, hotY) {
 }
 function buildSvgCursor(innerSvg, hotX, hotY) {
   // Line-art SVG cursor for tools that don't have a clear emoji equivalent.
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="%23ff8fab" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${innerSvg}</svg>`;
-  return `url("data:image/svg+xml;utf8,${svg}") ${hotX} ${hotY}, auto`;
+  // Must encodeURIComponent — otherwise embedded `"` and `#` in the SVG break
+  // the outer cursor: url("...") string and the cursor silently falls back.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ff8fab" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${innerSvg}</svg>`;
+  return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${hotX} ${hotY}, auto`;
 }
 const TOOL_CURSORS = {
   brush:  buildEmojiCursor('✏️', 4, 28),   // tip = bottom-left
