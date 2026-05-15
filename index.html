@@ -813,8 +813,9 @@
     box-shadow: 0 20px 50px rgba(0,0,0,0.15);
     padding: 36px;
     border-radius: 4px;
-    margin-bottom: 24px;
+    margin: 0 auto 24px;
   }
+  #export-pages { display: flex; flex-direction: column; align-items: center; }
   .a4 .head {
     border-bottom: 2px solid #1f2937;
     padding-bottom: 12px;
@@ -828,7 +829,7 @@
   .a4 h1 { margin: 0 0 4px; font-size: 22px; color: #1f2937; }
   .a4 .meta { color: #6b7280; font-size: 12px; }
   .a4 .pattern-wrap { text-align: center; margin-bottom: 24px; }
-  .a4 #export-canvas {
+  .a4 .pattern-wrap canvas {
     max-width: 100%;
     image-rendering: pixelated;
     border: 1px solid #d1d5db;
@@ -888,12 +889,10 @@
       padding: 0 !important;
       margin: 0 !important;
       border-radius: 0 !important;
+      page-break-inside: avoid;
     }
-    .a4 #export-canvas {
-      max-width: 100% !important;
-      max-height: 60vh;
-      border: 1px solid #1f2937 !important;
-    }
+    .a4 + .a4 { page-break-before: always; }
+    .a4 .pattern-wrap canvas { max-width: 100%; height: auto !important; border: 1px solid #1f2937 !important; }
     .export-legend {
       grid-template-columns: repeat(4, 1fr);
       font-size: 10px;
@@ -1431,26 +1430,10 @@
 
   <!-- Export -->
   <section id="v-export" class="view">
-    <div class="a4">
-      <div class="head">
-        <div>
-          <h1>拼豆图纸</h1>
-          <div class="meta">PixelBead · <span id="export-brand">MARD</span> 色板 · <span id="export-date"></span></div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-weight:700" id="export-size">尺寸 29×29</div>
-          <div class="meta">建议 <span id="bead-size-label">2.6mm 迷你豆</span></div>
-        </div>
-      </div>
-      <div class="pattern-wrap">
-        <canvas id="export-canvas"></canvas>
-      </div>
-      <h3>颜色对照表 <span id="export-total" style="color:#6b7280;font-weight:500;font-size:13px;margin-left:8px"></span></h3>
-      <div id="export-legend" class="export-legend"></div>
-      <div class="print-tip">每格内数字对应下表编号；行/列号沿画板上方与左侧。</div>
-      <div style="margin-top:16px;text-align:center" class="no-print">
-        <button class="btn-primary" onclick="window.print()">🖨️ 打印 / 另存为 PDF</button>
-      </div>
+    <div id="export-pages"></div>
+    <div style="margin: 16px auto 32px; text-align:center" class="no-print">
+      <button class="btn-primary" onclick="window.print()">🖨️ 打印 / 另存为 PDF</button>
+      <div style="font-size:11px;color:var(--c-text-3);margin-top:6px">大图自动分页 · A4 纵向 · 推荐保留默认页边距</div>
     </div>
   </section>
 </div>
@@ -3327,42 +3310,49 @@ function renderMaterials() {
 }
 
 /* ============== Export ============== */
-function renderExport() {
-  const exCanvas = document.getElementById('export-canvas');
+const CELLS_PER_PAGE = 30;
+
+function drawPatternPage(canvasEl, opts) {
+  const { rowStart, rowEnd, colStart, colEnd, colorIndex, beadStyle } = opts;
+  const cols = colEnd - colStart;
+  const rows = rowEnd - rowStart;
   const px = 22;
-  const W = state.size * px + AXIS_PX;
-  const H = state.size * px + AXIS_PX;
-  exCanvas.width = W;
-  exCanvas.height = H;
-  const ec = exCanvas.getContext('2d');
+  const W = cols * px + AXIS_PX;
+  const H = rows * px + AXIS_PX;
+  canvasEl.width = W;
+  canvasEl.height = H;
+  const ec = canvasEl.getContext('2d');
   ec.fillStyle = '#ffffff';
   ec.fillRect(0, 0, W, H);
-
-  const colorIndex = buildColorIndex();
-
-  // Pegboard guidelines (every 5)
-  ec.lineWidth = 0.5;
-  for (let i = 0; i <= state.size; i++) {
-    ec.strokeStyle = (i % 5 === 0) ? '#9ca3af' : '#e5e7eb';
-    ec.lineWidth = (i % 5 === 0) ? 0.8 : 0.4;
+  // grid lines (every 5 across whole image, so within this slice we offset)
+  for (let i = 0; i <= rows; i++) {
+    const absRow = rowStart + i;
+    ec.strokeStyle = (absRow % 5 === 0) ? '#9ca3af' : '#e5e7eb';
+    ec.lineWidth = (absRow % 5 === 0) ? 0.8 : 0.4;
     ec.beginPath();
     ec.moveTo(AXIS_PX, AXIS_PX + i * px);
-    ec.lineTo(AXIS_PX + state.size * px, AXIS_PX + i * px);
-    ec.stroke();
-    ec.beginPath();
-    ec.moveTo(AXIS_PX + i * px, AXIS_PX);
-    ec.lineTo(AXIS_PX + i * px, AXIS_PX + state.size * px);
+    ec.lineTo(AXIS_PX + cols * px, AXIS_PX + i * px);
     ec.stroke();
   }
-
-  // Beads + numbers
-  for (let y = 0; y < state.size; y++) {
-    for (let x = 0; x < state.size; x++) {
-      const id = state.grid[y][x];
+  for (let i = 0; i <= cols; i++) {
+    const absCol = colStart + i;
+    ec.strokeStyle = (absCol % 5 === 0) ? '#9ca3af' : '#e5e7eb';
+    ec.lineWidth = (absCol % 5 === 0) ? 0.8 : 0.4;
+    ec.beginPath();
+    ec.moveTo(AXIS_PX + i * px, AXIS_PX);
+    ec.lineTo(AXIS_PX + i * px, AXIS_PX + rows * px);
+    ec.stroke();
+  }
+  // beads
+  for (let yy = 0; yy < rows; yy++) {
+    for (let xx = 0; xx < cols; xx++) {
+      const ay = rowStart + yy, ax = colStart + xx;
+      const id = state.grid[ay][ax];
       if (!id) continue;
       const c = PALETTE_BY_ID[id];
-      const cx = AXIS_PX + x * px + px/2, cy = AXIS_PX + y * px + px/2;
-      drawBead(ec, cx, cy, px, c.hex, state.beadStyle, (y * state.size + x) * 1009 + 17);
+      const cx = AXIS_PX + xx * px + px / 2;
+      const cy = AXIS_PX + yy * px + px / 2;
+      drawBead(ec, cx, cy, px, c.hex, beadStyle, (ay * state.size + ax) * 1009 + 17);
       ec.fillStyle = textColorOn(c.hex);
       ec.font = `700 ${Math.floor(px * 0.45)}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
       ec.textAlign = 'center';
@@ -3370,34 +3360,115 @@ function renderExport() {
       ec.fillText(String(colorIndex.get(id) || ''), cx, cy + 0.5);
     }
   }
-  // 毛巾烫: global towel/parchment weave overlay
-  if (state.beadStyle === 'fluffy') drawFluffyOverlay(ec, W, H, px, AXIS_PX);
-  // outer pegboard frame
+  if (beadStyle === 'fluffy') drawFluffyOverlay(ec, W, H, px, AXIS_PX);
   ec.strokeStyle = '#1f2937';
   ec.lineWidth = 1.5;
-  ec.strokeRect(AXIS_PX, AXIS_PX, state.size * px, state.size * px);
-  // Axis labels
-  drawAxisLabels(ec, state.size, px, W, H);
+  ec.strokeRect(AXIS_PX, AXIS_PX, cols * px, rows * px);
+  // axis labels (showing absolute row/col indices)
+  ec.fillStyle = '#374151';
+  ec.font = `600 12px ui-sans-serif, system-ui, "PingFang SC", sans-serif`;
+  ec.textAlign = 'center';
+  ec.textBaseline = 'middle';
+  for (let i = 0; i < cols; i++) {
+    const absCol = colStart + i + 1;
+    if (absCol % 5 === 0 || i === 0 || i === cols - 1) {
+      ec.fillText(String(absCol), AXIS_PX + i * px + px / 2, AXIS_PX / 2);
+    }
+  }
+  ec.textAlign = 'right';
+  for (let i = 0; i < rows; i++) {
+    const absRow = rowStart + i + 1;
+    if (absRow % 5 === 0 || i === 0 || i === rows - 1) {
+      ec.fillText(String(absRow), AXIS_PX - 4, AXIS_PX + i * px + px / 2);
+    }
+  }
+}
 
-  document.getElementById('export-size').textContent = `尺寸 ${state.size}×${state.size}（约 ${(state.size * currentBeadMm() / 10).toFixed(1)}×${(state.size * currentBeadMm() / 10).toFixed(1)}cm）`;
-  const exBrandEl = document.getElementById('export-brand');
-  if (exBrandEl) exBrandEl.textContent = (BRANDS[state.brand]?.name) || state.brand;
-  const beadLbl = document.getElementById('bead-size-label');
-  if (beadLbl) beadLbl.textContent = currentBeadLabel();
-  const d = new Date();
-  document.getElementById('export-date').textContent = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+function renderExport() {
+  const root = document.getElementById('export-pages');
+  if (!root) return;
+  root.innerHTML = '';
+  const colorIndex = buildColorIndex();
+  const beadStyle = state.beadStyle;
+  const brandName = (BRANDS[state.brand]?.name) || state.brand;
+  const beadLbl = currentBeadLabel();
+  const dt = new Date();
+  const dateStr = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+  const sizeStr = `${state.size}×${state.size}（约 ${(state.size * currentBeadMm() / 10).toFixed(1)}×${(state.size * currentBeadMm() / 10).toFixed(1)}cm）`;
 
-  // Compact 3-col legend (replaces the bulky table)
-  const legend = document.getElementById('export-legend');
-  legend.innerHTML = '';
-  const list = tallyColors().map(c => ({ ...c, n: colorIndex.get(c.id) || 0 }))
-    .sort((a, b) => a.n - b.n);
+  // Build page slices.
+  const N = state.size;
+  const cols = Math.ceil(N / CELLS_PER_PAGE);
+  const rows = Math.ceil(N / CELLS_PER_PAGE);
+  const slices = [];
+  for (let pr = 0; pr < rows; pr++) {
+    for (let pc = 0; pc < cols; pc++) {
+      slices.push({
+        rowStart: pr * CELLS_PER_PAGE,
+        rowEnd: Math.min(N, (pr + 1) * CELLS_PER_PAGE),
+        colStart: pc * CELLS_PER_PAGE,
+        colEnd: Math.min(N, (pc + 1) * CELLS_PER_PAGE),
+        pr, pc,
+      });
+    }
+  }
+  const totalPages = slices.length + 1; // +1 for legend page
+
+  slices.forEach((s, i) => {
+    const page = document.createElement('div');
+    page.className = 'a4 a4-pattern';
+    const isPaged = slices.length > 1;
+    page.innerHTML = `
+      <div class="head">
+        <div>
+          <h1>拼豆图纸${isPaged ? ` · 第 ${i + 1}/${totalPages} 页` : ''}</h1>
+          <div class="meta">PixelBead · ${brandName} 色板 · ${dateStr}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:700">尺寸 ${sizeStr}</div>
+          <div class="meta">建议 ${beadLbl}${isPaged ? ` · 区段 行 ${s.rowStart + 1}–${s.rowEnd} · 列 ${s.colStart + 1}–${s.colEnd}` : ''}</div>
+        </div>
+      </div>
+      <div class="pattern-wrap"><canvas></canvas></div>
+      <div class="print-tip">${
+        isPaged
+          ? `本页是整图 ${rows}×${cols} 拼图中的第 (行 ${s.pr + 1}, 列 ${s.pc + 1}) 页。每格内数字对应末页色卡编号；拼接时以行/列号对齐。`
+          : `每格内数字对应下页色卡编号；行/列号沿画板上方与左侧。`
+      }</div>
+    `;
+    root.appendChild(page);
+    const cv = page.querySelector('canvas');
+    drawPatternPage(cv, { ...s, colorIndex, beadStyle });
+  });
+
+  // Legend page (always last).
+  const list = tallyColors().map(c => ({ ...c, n: colorIndex.get(c.id) || 0 })).sort((a, b) => a.n - b.n);
+  const total = list.reduce((s, c) => s + c.count, 0);
+  const legendPage = document.createElement('div');
+  legendPage.className = 'a4 a4-legend';
+  legendPage.innerHTML = `
+    <div class="head">
+      <div>
+        <h1>颜色对照表${slices.length > 1 ? ` · 第 ${totalPages}/${totalPages} 页` : ''}</h1>
+        <div class="meta">PixelBead · ${brandName} 色板 · ${dateStr}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:700">尺寸 ${sizeStr}</div>
+        <div class="meta">${total > 0 ? `共 ${list.length} 色 · ${total} 颗` : '画布是空的'}</div>
+      </div>
+    </div>
+    <h3>颜色对照表 <span style="color:#6b7280;font-weight:500;font-size:13px;margin-left:8px">${total > 0 ? `共 ${list.length} 色 · ${total} 颗` : ''}</span></h3>
+    <div class="export-legend"></div>
+    <div class="print-tip">数字对应图纸格子内编号；用量表示完成本图所需该色珠子数量。</div>
+  `;
+  const legend = legendPage.querySelector('.export-legend');
   if (list.length === 0) {
     legend.innerHTML = '<div class="leg-empty">画布还是空的</div>';
   } else {
     list.forEach(c => {
       const item = document.createElement('div');
       item.className = 'leg-item';
+      const pct = total > 0 ? ' · ' + ((c.count / total) * 100).toFixed(1) + '%' : '';
       const numEl = document.createElement('span');
       numEl.className = 'leg-num';
       numEl.style.background = c.hex;
@@ -3405,7 +3476,7 @@ function renderExport() {
       numEl.textContent = String(c.n);
       const idEl = document.createElement('span');
       idEl.className = 'leg-id';
-      idEl.textContent = c.id;
+      idEl.textContent = c.id + pct;
       const qtyEl = document.createElement('span');
       qtyEl.className = 'leg-qty';
       qtyEl.textContent = '×' + c.count;
@@ -3415,10 +3486,7 @@ function renderExport() {
       legend.appendChild(item);
     });
   }
-  const total = list.reduce((s, c) => s + c.count, 0);
-  document.getElementById('export-total').textContent = total > 0
-    ? `共 ${list.length} 色 · ${total} 颗`
-    : '';
+  root.appendChild(legendPage);
 }
 
 /* ============== Resize ============== */
