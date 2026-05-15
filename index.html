@@ -761,6 +761,43 @@
   }
   .material-item .lbl { font-weight: 600; }
   .material-item .qty { font-weight: 700; color: var(--c-secondary); font-variant-numeric: tabular-nums; }
+  .material-item .pct {
+    font-weight: 500;
+    color: var(--c-text-3);
+    font-size: 11px;
+    margin-right: 8px;
+    font-variant-numeric: tabular-nums;
+    min-width: 38px;
+    text-align: right;
+  }
+  .material-item.sparse { background: rgba(255, 200, 87, 0.16); }
+  .material-item.sparse .qty { color: #b45309; }
+  .merge-bar {
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    background: rgba(255, 200, 87, 0.18);
+    border: 1px solid rgba(255, 200, 87, 0.5);
+    border-radius: var(--r-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .merge-bar .merge-msg { color: #92400e; line-height: 1.35; }
+  .merge-bar .merge-btn {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border-radius: var(--r-sm);
+    background: var(--c-primary);
+    color: #fff;
+    border: none;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .merge-bar .merge-btn:hover { background: var(--c-secondary); }
   .empty-hint { font-size: 12px; color: var(--c-text-3); text-align: center; padding: 16px 0; }
 
   /* Export */
@@ -3082,11 +3119,7 @@ function renderPalette() {
   let visibleCount = 0;
 
   // 1) "Used colors" block (sorted by frequency desc) — only when grid has paint.
-  const usedCounts = tallyColors();
-  const usedSorted = Array.from(usedCounts.entries())
-    .map(([id, count]) => ({ id, count, color: PALETTE_BY_ID[id] }))
-    .filter(x => x.color)
-    .sort((a, b) => b.count - a.count);
+  const usedSorted = tallyColors();
   if (usedSorted.length > 0 && !q) {
     const block = document.createElement('div');
     block.className = 'used-block';
@@ -3096,14 +3129,14 @@ function renderPalette() {
     block.appendChild(ttl);
     const grid = document.createElement('div');
     grid.className = 'used-grid';
-    usedSorted.forEach(({ id, count, color }) => {
+    usedSorted.forEach(color => {
       const dot = document.createElement('button');
-      dot.className = 'used-dot' + (id === state.selectedColorId ? ' active' : '');
+      dot.className = 'used-dot' + (color.id === state.selectedColorId ? ' active' : '');
       dot.style.background = color.hex;
-      dot.dataset.count = count;
-      dot.title = `${color.id} · ${color.hex} · ${count} 颗`;
+      dot.dataset.count = color.count;
+      dot.title = `${color.id} · ${color.hex} · ${color.count} 颗`;
       dot.addEventListener('click', () => {
-        state.selectedColorId = id;
+        state.selectedColorId = color.id;
         renderPalette();
       });
       grid.appendChild(dot);
@@ -3193,6 +3226,46 @@ function tallyColors() {
     .sort((a, b) => b.count - a.count);
 }
 
+const SPARSE_THRESHOLD = 3;
+function mergeSparseColors() {
+  const list = tallyColors();
+  if (list.length < 2) return 0;
+  const sparse = list.filter(c => c.count <= SPARSE_THRESHOLD);
+  if (sparse.length === 0) return 0;
+  const survivors = list.filter(c => c.count > SPARSE_THRESHOLD);
+  if (survivors.length === 0) return 0;
+  // Build a quick remap: sparse id → nearest-by-Lab survivor id.
+  const remap = {};
+  sparse.forEach(c => {
+    let bestId = survivors[0].id;
+    let bestD = Infinity;
+    const [sl, sa, sb] = c.lab || rgbToLab(c.rgb[0], c.rgb[1], c.rgb[2]);
+    survivors.forEach(s => {
+      const [tl, ta, tb] = s.lab || rgbToLab(s.rgb[0], s.rgb[1], s.rgb[2]);
+      const d = (sl-tl)*(sl-tl) + (sa-ta)*(sa-ta) + (sb-tb)*(sb-tb);
+      if (d < bestD) { bestD = d; bestId = s.id; }
+    });
+    remap[c.id] = bestId;
+  });
+  let touched = 0;
+  for (let y = 0; y < state.size; y++) {
+    for (let x = 0; x < state.size; x++) {
+      const id = state.grid[y][x];
+      if (!id || !remap[id]) continue;
+      state.grid[y][x] = remap[id];
+      touched++;
+    }
+  }
+  if (touched > 0) {
+    pushHistory();
+    renderCanvas();
+    renderMaterials();
+    renderPalette();
+    showToast(`已合并 ${sparse.length} 个稀疏色 (≤${SPARSE_THRESHOLD} 颗) · 共 ${touched} 颗`, 'ok');
+  }
+  return touched;
+}
+
 function renderMaterials() {
   const list = tallyColors();
   const root = document.getElementById('material-list');
@@ -3203,9 +3276,33 @@ function renderMaterials() {
     return;
   }
   root.innerHTML = '';
+
+  // Merge bar — when there are sparse colors and at least one survivor.
+  const sparseCount = list.filter(c => c.count <= SPARSE_THRESHOLD).length;
+  const survivorsExist = list.some(c => c.count > SPARSE_THRESHOLD);
+  if (sparseCount >= 2 && survivorsExist) {
+    const bar = document.createElement('div');
+    bar.className = 'merge-bar';
+    const msg = document.createElement('div');
+    msg.className = 'merge-msg';
+    msg.textContent = `${sparseCount} 个色仅 ≤${SPARSE_THRESHOLD} 颗，购入零碎`;
+    const btn = document.createElement('button');
+    btn.className = 'merge-btn';
+    btn.textContent = '一键合并';
+    btn.title = '将每个稀疏色按色彩距离合并到最近的常用色，需购清单更精简';
+    btn.addEventListener('click', () => {
+      if (confirm(`将 ${sparseCount} 个稀疏色合并到最相近的常用色？此操作可撤销。`)) {
+        mergeSparseColors();
+      }
+    });
+    bar.appendChild(msg);
+    bar.appendChild(btn);
+    root.appendChild(bar);
+  }
+
   list.forEach(c => {
     const item = document.createElement('div');
-    item.className = 'material-item';
+    item.className = 'material-item' + (c.count <= SPARSE_THRESHOLD ? ' sparse' : '');
     const il = document.createElement('div');
     il.className = 'l';
     const md = document.createElement('span');
@@ -3216,10 +3313,14 @@ function renderMaterials() {
     lbl.textContent = c.id;
     il.appendChild(md);
     il.appendChild(lbl);
+    const pct = document.createElement('span');
+    pct.className = 'pct';
+    pct.textContent = total > 0 ? ((c.count / total) * 100).toFixed(1) + '%' : '';
     const qty = document.createElement('div');
     qty.className = 'qty';
     qty.textContent = '×' + c.count;
     item.appendChild(il);
+    item.appendChild(pct);
     item.appendChild(qty);
     root.appendChild(item);
   });
