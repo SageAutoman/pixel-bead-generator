@@ -346,6 +346,51 @@
     overflow: hidden;
     touch-action: none;
   }
+  .canvas-empty-hint {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--c-text-3);
+    pointer-events: none;
+    user-select: none;
+    z-index: 5;
+    transition: opacity 0.2s;
+  }
+  .canvas-empty-hint .ceh-icon { font-size: 48px; opacity: 0.5; }
+  .canvas-empty-hint .ceh-title {
+    font-size: 14px; font-weight: 600; color: var(--c-text-2);
+    margin-top: 8px;
+  }
+  .canvas-empty-hint .ceh-sub {
+    font-size: 12px; color: var(--c-text-3);
+    margin-top: 4px;
+  }
+  .canvas-empty-hint.hidden { opacity: 0; }
+  .canvas-drop-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 143, 171, 0.12);
+    border: 2px dashed var(--c-primary);
+    border-radius: 12px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 50;
+  }
+  .canvas-drop-overlay.show { display: flex; }
+  .canvas-drop-overlay .cdo-card {
+    background: var(--c-paper);
+    border-radius: var(--r-md);
+    padding: 24px 32px;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(255, 143, 171, 0.3);
+    border: 1px solid var(--c-primary);
+  }
+  .canvas-drop-overlay .cdo-icon { font-size: 36px; }
+  .canvas-drop-overlay .cdo-title { font-size: 15px; font-weight: 600; color: var(--c-primary); margin-top: 6px; }
+  .canvas-drop-overlay .cdo-sub { font-size: 12px; color: var(--c-text-2); margin-top: 4px; }
   #canvas {
     position: absolute;
     image-rendering: pixelated;
@@ -1185,6 +1230,18 @@
       </div>
       <div class="canvas-wrap" id="canvas-wrap">
         <canvas id="canvas"></canvas>
+        <div class="canvas-empty-hint" id="canvas-empty-hint">
+          <div class="ceh-icon">🖼️</div>
+          <div class="ceh-title">空白画布已就绪</div>
+          <div class="ceh-sub">拖拽图片到这里自动转图纸 · 或选左侧画笔开画</div>
+        </div>
+        <div class="canvas-drop-overlay" id="canvas-drop-overlay">
+          <div class="cdo-card">
+            <div class="cdo-icon">⬇️</div>
+            <div class="cdo-title">松手即转图纸</div>
+            <div class="cdo-sub">支持 JPG / PNG，自动像素化匹配色卡</div>
+          </div>
+        </div>
         <div class="zoom-readout" id="zoom-readout" data-tip="点击切换缩放比例 (0=适配 / 1=100%)" data-tip-side="top">100%</div>
         <div class="zoom-popover" id="zoom-popover" role="menu">
           <button data-zoom-preset="0.25">25%</button>
@@ -1748,6 +1805,48 @@ dropZone.addEventListener('drop', (e) => {
   const file = e.dataTransfer?.files?.[0];
   if (file && file.type.startsWith('image/')) handleImageUpload(file, landingSize);
 });
+
+/* Drag-drop directly onto the editor canvas — handles drops while user is
+   already inside the editor. Uses a window-level dragover counter so the
+   overlay doesn't flicker when crossing child elements. */
+(function setupCanvasDrop() {
+  const wrapEl = document.getElementById('canvas-wrap');
+  const overlay = document.getElementById('canvas-drop-overlay');
+  if (!wrapEl || !overlay) return;
+  let counter = 0;
+  function isFileDrag(e) {
+    if (!e.dataTransfer) return false;
+    const types = e.dataTransfer.types;
+    if (!types) return false;
+    return [].slice.call(types).indexOf('Files') !== -1;
+  }
+  window.addEventListener('dragenter', (e) => {
+    if (!isFileDrag(e)) return;
+    counter++;
+    overlay.classList.add('show');
+  });
+  window.addEventListener('dragleave', (e) => {
+    if (!isFileDrag(e)) return;
+    counter--;
+    if (counter <= 0) { counter = 0; overlay.classList.remove('show'); }
+  });
+  window.addEventListener('dragover', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+  });
+  wrapEl.addEventListener('drop', (e) => {
+    e.preventDefault();
+    counter = 0;
+    overlay.classList.remove('show');
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith('image/')) handleImageUpload(file, state.size);
+  });
+  // Safety: if drop happens elsewhere, still hide overlay.
+  window.addEventListener('drop', () => {
+    counter = 0;
+    overlay.classList.remove('show');
+  });
+})();
 document.getElementById('btn-reupload').addEventListener('click', () => {
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = 'image/*';
@@ -2435,6 +2534,9 @@ function drawAxisLabels(c, size, px, w, h) {
 
 function renderCanvas() {
   setCanvasSize();
+  // Toggle the empty-canvas hint based on whether the grid has any paint.
+  const hint = document.getElementById('canvas-empty-hint');
+  if (hint) hint.classList.toggle('hidden', !isGridEmpty(state.grid));
   const px = CELL_PX;
   const W = canvas.width, H = canvas.height;
   ctx.fillStyle = '#ffffff';
