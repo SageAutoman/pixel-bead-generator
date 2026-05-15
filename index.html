@@ -2179,8 +2179,11 @@ async function mlRemoveBackground(srcImg, onProgress) {
   canvas.width = Math.max(1, Math.round(sw * scale));
   canvas.height = Math.max(1, Math.round(sh * scale));
   canvas.getContext('2d').drawImage(srcImg, 0, 0, canvas.width, canvas.height);
+  // library only accepts string|URL|Blob|ArrayBuffer — not HTMLCanvasElement.
+  // library only accepts string|URL|Blob|ArrayBuffer — not HTMLCanvasElement.
+  const canvasBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   // 'small' model is ~10MB instead of ~80MB for isnet — friendlier first-run.
-  const blob = await lib.removeBackground(canvas, {
+  const resultBlob = await lib.removeBackground(canvasBlob, {
     model: 'small',
     output: { format: 'image/png', quality: 0.9 },
     progress: (key, current, total) => {
@@ -2189,7 +2192,7 @@ async function mlRemoveBackground(srcImg, onProgress) {
   });
   // Decode the blob back to an HTMLImageElement so the rest of the pipeline
   // can use it as a drop-in for the original `img`.
-  const url = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(resultBlob);
   const out = await new Promise((resolve, reject) => {
     const im = new Image();
     im.onload = () => resolve(im);
