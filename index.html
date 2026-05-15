@@ -141,6 +141,39 @@
   }
   .landing-card h2 { margin: 0 0 6px; font-size: 22px; }
   .landing-card .sub { color: var(--c-text-2); margin: 0 0 20px; font-size: 13px; line-height: 1.5; }
+  .draft-banner {
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: rgba(255, 143, 171, 0.12);
+    border: 1px solid rgba(255, 143, 171, 0.4);
+    border-radius: var(--r-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .draft-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .draft-icon { font-size: 22px; }
+  .draft-title { font-weight: 600; font-size: 13px; color: var(--c-text); }
+  .draft-meta { font-size: 11px; color: var(--c-text-2); margin-top: 2px; }
+  .draft-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .draft-actions button {
+    padding: 6px 12px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--c-border);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    background: var(--c-paper);
+    color: var(--c-text);
+  }
+  .draft-actions .btn-primary {
+    background: var(--c-primary);
+    border-color: var(--c-primary);
+    color: #fff;
+  }
+  .draft-actions .btn-primary:hover { background: var(--c-secondary); border-color: var(--c-secondary); }
+  .draft-actions .btn-secondary:hover { background: var(--c-toolbar-bg); }
   .upload-area {
     display: block;
     border: 2px dashed var(--c-primary);
@@ -1068,6 +1101,19 @@
         <button class="size-btn" data-size="58"><span class="n">58²</span><span class="lbl">~15cm</span></button>
       </div>
       <button class="start-btn" id="btn-blank">🎨 创建空白画布</button>
+      <div class="draft-banner" id="draft-banner" hidden>
+        <div class="draft-info">
+          <span class="draft-icon">📝</span>
+          <div>
+            <div class="draft-title">上次草稿</div>
+            <div class="draft-meta" id="draft-meta">—</div>
+          </div>
+        </div>
+        <div class="draft-actions">
+          <button class="btn-secondary" id="btn-discard-draft">丢弃</button>
+          <button class="btn-primary" id="btn-resume-draft">继续编辑</button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -1380,24 +1426,103 @@ function makeGrid(size) {
 function cloneGrid(g) {
   return g.map(row => row.slice());
 }
+/* ============== Draft (localStorage) ============== */
+const DRAFT_KEY = 'pixelbead.draft.v1';
+let draftDirty = false;
+let draftSaveTimer = null;
+function isGridEmpty(g) {
+  if (!g) return true;
+  for (const row of g) for (const c of row) if (c) return false;
+  return true;
+}
+function saveDraft() {
+  if (!state.grid || isGridEmpty(state.grid)) {
+    // Empty grid: clear stale draft instead of overwriting with blank.
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+    draftDirty = false;
+    return;
+  }
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      v: 1,
+      ts: Date.now(),
+      brand: state.brand,
+      size: state.size,
+      grid: state.grid
+    }));
+    draftDirty = false;
+  } catch (e) { console.warn('saveDraft failed', e); }
+}
+function scheduleDraftSave() {
+  draftDirty = true;
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(saveDraft, 600);
+}
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!d || !d.grid || !d.size) return null;
+    return d;
+  } catch (e) { return null; }
+}
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  draftDirty = false;
+}
+function applyDraft(d) {
+  if (d.brand && BRANDS[d.brand]) {
+    state.brand = d.brand;
+    PALETTE = buildPaletteFromRaw(BRANDS[d.brand].colors);
+    buildColorIndex();
+    document.querySelectorAll('.brand-tag').forEach(b => {
+      b.classList.toggle('active', b.dataset.brand === d.brand);
+    });
+  }
+  state.size = d.size;
+  state.grid = cloneGrid(d.grid);
+  state.history = [cloneGrid(state.grid)];
+  state.historyIdx = 0;
+  syncEditorSizeUI();
+  setCanvasSize();
+  renderCanvas();
+  renderPalette();
+  renderMaterials();
+  refreshActionBar();
+  switchView('editor');
+  fitCanvas();
+}
+window.addEventListener('beforeunload', (e) => {
+  if (draftDirty) { try { saveDraft(); } catch (err) {} }
+  // Only prompt the user if there's actual unsaved-feeling content.
+  if (state.grid && !isGridEmpty(state.grid) && state.historyIdx > 0) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
 function pushHistory() {
   state.history = state.history.slice(0, state.historyIdx + 1);
   state.history.push(cloneGrid(state.grid));
   if (state.history.length > 50) state.history.shift();
   state.historyIdx = state.history.length - 1;
   refreshActionBar();
+  scheduleDraftSave();
 }
 function undo() {
   if (state.historyIdx <= 0) return;
   state.historyIdx--;
   state.grid = cloneGrid(state.history[state.historyIdx]);
   renderCanvas(); renderMaterials(); refreshActionBar();
+  scheduleDraftSave();
 }
 function redo() {
   if (state.historyIdx >= state.history.length - 1) return;
   state.historyIdx++;
   state.grid = cloneGrid(state.history[state.historyIdx]);
   renderCanvas(); renderMaterials(); refreshActionBar();
+  scheduleDraftSave();
 }
 function refreshActionBar() {
   document.getElementById('btn-undo').disabled = state.historyIdx <= 0;
@@ -2197,7 +2322,7 @@ function applyOutline(hex, neighborhood) {
 document.getElementById('btn-undo').addEventListener('click', undo);
 document.getElementById('btn-redo').addEventListener('click', redo);
 document.getElementById('btn-new').addEventListener('click', () => {
-  if (confirm('新建会清空当前图纸，确认？')) { initGrid(state.size); }
+  if (confirm('新建会清空当前图纸，确认？')) { initGrid(state.size); clearDraft(); }
 });
 document.getElementById('btn-clear').addEventListener('click', () => {
   if (confirm('清空当前画布？')) { state.grid = makeGrid(state.size); pushHistory(); renderCanvas(); renderMaterials(); }
@@ -2964,6 +3089,38 @@ function pinchDistance() {
 initGrid(29);
 renderPalette();
 updateCursor();
+
+// Draft restore banner.
+(function setupDraftBanner() {
+  const banner = document.getElementById('draft-banner');
+  const metaEl = document.getElementById('draft-meta');
+  const btnResume = document.getElementById('btn-resume-draft');
+  const btnDiscard = document.getElementById('btn-discard-draft');
+  if (!banner) return;
+  const draft = loadDraft();
+  if (!draft) return;
+  // Show banner.
+  const ageMin = Math.max(1, Math.round((Date.now() - draft.ts) / 60000));
+  const sizeStr = draft.size + '×' + draft.size;
+  let painted = 0;
+  for (const row of draft.grid) for (const c of row) if (c) painted++;
+  const brandName = (BRANDS[draft.brand]?.name) || draft.brand || '未知';
+  const when = ageMin < 60 ? `${ageMin} 分钟前`
+             : ageMin < 60 * 24 ? `${Math.round(ageMin / 60)} 小时前`
+             : `${Math.round(ageMin / 60 / 24)} 天前`;
+  metaEl.textContent = `${when} · ${sizeStr} · ${painted} 颗 · ${brandName}`;
+  banner.hidden = false;
+  btnResume.addEventListener('click', () => {
+    applyDraft(draft);
+    showToast('已恢复上次草稿 ✓');
+  });
+  btnDiscard.addEventListener('click', () => {
+    if (!confirm('丢弃这份草稿？此操作不可撤销。')) return;
+    clearDraft();
+    banner.hidden = true;
+    showToast('草稿已丢弃');
+  });
+})();
 </script>
 </body>
 </html>
