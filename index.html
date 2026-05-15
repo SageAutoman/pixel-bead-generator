@@ -538,6 +538,91 @@
   }
   @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
 
+  /* Crop modal (cropperjs) */
+  .crop-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.82);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    animation: fadein 0.18s ease-out;
+  }
+  .crop-modal.open { display: flex; }
+  .crop-modal-card {
+    background: var(--c-paper);
+    border-radius: 16px;
+    width: min(92vw, 760px);
+    height: min(88vh, 720px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  }
+  .crop-modal-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--c-border);
+  }
+  .crop-modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--c-text);
+  }
+  .crop-modal-header .crop-sub {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--c-text-3);
+  }
+  .crop-modal-body {
+    flex: 1;
+    min-height: 0;
+    background: #1a1a1a;
+    position: relative;
+    overflow: hidden;
+  }
+  .crop-modal-body img {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  .crop-modal-actions {
+    padding: 12px 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid var(--c-border);
+    flex-wrap: wrap;
+  }
+  .crop-modal-actions button {
+    padding: 8px 16px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--c-border);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .crop-modal-actions .btn-primary {
+    background: var(--c-primary);
+    color: white;
+    border-color: var(--c-primary);
+  }
+  .crop-modal-actions .btn-primary:hover { background: var(--c-secondary); border-color: var(--c-secondary); }
+  .crop-modal-actions .btn-secondary {
+    background: transparent;
+    color: var(--c-text);
+  }
+  .crop-modal-actions .btn-secondary:hover { background: var(--c-toolbar-bg); }
+  /* cropperjs view enhancements: 3x3 guide opacity */
+  .cropper-view-box, .cropper-face { border-radius: 4px; }
+  .cropper-line, .cropper-point { background-color: var(--c-primary); }
+  .cropper-dashed { border-color: rgba(255, 143, 171, 0.55); }
+  @media (max-width: 600px) {
+    .crop-modal-card { width: 100vw; height: 100vh; border-radius: 0; }
+  }
+
   /* Outline popover (designer spec) */
   .outline-pop {
     position: fixed;
@@ -1506,6 +1591,24 @@
   </div>
 </div>
 
+<!-- Crop modal (cropperjs lazy-loaded on first upload) -->
+<div class="crop-modal" id="crop-modal">
+  <div class="crop-modal-card">
+    <div class="crop-modal-header">
+      <h3>✂️ 框选主体区域</h3>
+      <p class="crop-sub">拖拽四角或边缘调整范围；点击确认后再做 AI 抠图与像素化</p>
+    </div>
+    <div class="crop-modal-body">
+      <img id="crop-img" alt="" />
+    </div>
+    <div class="crop-modal-actions">
+      <button class="btn-secondary" id="crop-skip">不裁切，直接转图</button>
+      <button class="btn-secondary" id="crop-cancel">取消</button>
+      <button class="btn-primary" id="crop-confirm">✓ 确认裁切</button>
+    </div>
+  </div>
+</div>
+
 <!-- Outline Popover -->
 <div class="outline-pop" id="outline-pop">
   <h4>🖼️ 一键描边</h4>
@@ -2063,9 +2166,115 @@ document.getElementById('btn-reupload').addEventListener('click', () => {
   inp.click();
 });
 
+/* ============== Cropper.js (lazy load) ============== */
+let cropperPromise = null;
+function ensureCropper() {
+  if (cropperPromise) return cropperPromise;
+  cropperPromise = (async () => {
+    // CSS
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css';
+    document.head.appendChild(link);
+    // JS
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('cropperjs CDN load failed'));
+      document.head.appendChild(s);
+    });
+    if (typeof window.Cropper !== 'function') {
+      throw new Error('Cropper global missing');
+    }
+    return window.Cropper;
+  })();
+  return cropperPromise;
+}
+
+async function openCropModal(srcImg, size) {
+  let Cropper;
+  try {
+    Cropper = await ensureCropper();
+  } catch (e) {
+    console.warn('Cropper failed to load, skipping crop step', e);
+    showToast('裁切组件加载失败，已跳过裁切直接转图', 'warn');
+    openCompareModal(srcImg, size);
+    return;
+  }
+  const modal = document.getElementById('crop-modal');
+  const cropImg = document.getElementById('crop-img');
+  // Reset any prior image
+  cropImg.src = srcImg.src;
+  modal.classList.add('open');
+  // Wait for the modal body + img to lay out before initializing cropper.
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  let cropper;
+  try {
+    cropper = new Cropper(cropImg, {
+      viewMode: 1,
+      guides: true,        // 3x3 grid lines (designer spec)
+      center: true,
+      background: false,   // we provide the dark backdrop ourselves
+      autoCropArea: 0.85,  // start with most of the image selected
+      movable: true,
+      zoomable: true,
+      rotatable: false,
+      scalable: false,
+      checkOrientation: false,
+      responsive: true,
+      restore: false,
+    });
+  } catch (e) {
+    console.warn('Cropper init failed', e);
+    modal.classList.remove('open');
+    openCompareModal(srcImg, size);
+    return;
+  }
+  const cleanup = () => {
+    try { cropper.destroy(); } catch (_) {}
+    modal.classList.remove('open');
+  };
+  const close = () => cleanup();
+  const skip = () => {
+    cleanup();
+    openCompareModal(srcImg, size);
+  };
+  const confirm = () => {
+    let canvas;
+    try {
+      canvas = cropper.getCroppedCanvas({
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+      });
+    } catch (e) {
+      console.warn('Cropper.getCroppedCanvas failed', e);
+      skip();
+      return;
+    }
+    cleanup();
+    canvas.toBlob((blob) => {
+      if (!blob) { openCompareModal(srcImg, size); return; }
+      const url = URL.createObjectURL(blob);
+      const cropped = new Image();
+      cropped.onload = () => {
+        URL.revokeObjectURL(url);
+        openCompareModal(cropped, size);
+      };
+      cropped.onerror = () => { openCompareModal(srcImg, size); };
+      cropped.src = url;
+    }, 'image/png');
+  };
+  document.getElementById('crop-cancel').onclick = close;
+  document.getElementById('crop-skip').onclick = skip;
+  document.getElementById('crop-confirm').onclick = confirm;
+}
+
 function handleImageUpload(file, size) {
   const img = new Image();
-  img.onload = () => openCompareModal(img, size);
+  img.onload = () => openCropModal(img, size);
   img.src = URL.createObjectURL(file);
 }
 
