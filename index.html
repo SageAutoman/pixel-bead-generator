@@ -1080,6 +1080,28 @@
     animation: spin 0.8s linear infinite;
     margin: 0 auto 12px;
   }
+  .compare-progress {
+    margin: 16px auto 0;
+    max-width: 320px;
+  }
+  .compare-progress-bar {
+    height: 6px;
+    background: var(--c-border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .compare-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--c-primary);
+    transition: width 0.2s ease-out;
+  }
+  .compare-progress-text {
+    font-size: 11px;
+    color: var(--c-text-3);
+    margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
   .modal-footer {
     text-align: center;
     margin-top: 20px;
@@ -1468,7 +1490,11 @@
       <div class="modal-sub">已为你生成两种拼豆图纸方案，挑一个继续编辑</div>
       <div class="compare-loading" id="compare-loading">
         <div class="spin"></div>
-        正在生成两种风格...
+        <div id="compare-loading-text">正在生成两种风格...</div>
+        <div class="compare-progress" id="compare-progress" hidden>
+          <div class="compare-progress-bar"><div class="compare-progress-fill" id="compare-progress-fill"></div></div>
+          <div class="compare-progress-text" id="compare-progress-text">0%</div>
+        </div>
       </div>
       <div id="compare-content" hidden>
         <div class="suggestion" id="size-suggestion" hidden>
@@ -1481,6 +1507,11 @@
             <input type="checkbox" id="bg-remove-toggle" checked />
             <span class="bg-toggle-track"><span class="bg-toggle-knob"></span></span>
             <span class="bg-toggle-text">✂️ 自动摘除背景</span>
+          </label>
+          <label class="bg-toggle-label" id="ml-toggle-wrap" style="margin-left:12px">
+            <input type="checkbox" id="bg-ml-toggle" checked />
+            <span class="bg-toggle-track"><span class="bg-toggle-knob"></span></span>
+            <span class="bg-toggle-text">🧠 AI 抠图（首次约 30s）</span>
           </label>
           <span class="bg-toggle-hint">主体清晰的照片效果最好；如有残留可关闭</span>
         </div>
@@ -2102,6 +2133,73 @@ function reducePaletteToTopN(grid, size, n) {
   return out;
 }
 
+/* ============== ML Background Removal (@imgly) ============== */
+let imglyLib = null;
+let imglyLoading = null;
+async function ensureImgly(onProgress) {
+  if (imglyLib) return imglyLib;
+  if (imglyLoading) return imglyLoading;
+  imglyLoading = (async () => {
+    if (onProgress) onProgress('script', 0);
+    // ESM CDN — module is small, model assets are fetched on first call.
+    const mod = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.6.0/+esm');
+    imglyLib = mod;
+    return mod;
+  })();
+  return imglyLoading;
+}
+async function mlRemoveBackground(srcImg, onProgress) {
+  const lib = await ensureImgly(onProgress);
+  // Render to a canvas so we control resolution & input format.
+  const maxSide = 1024;
+  const sw = srcImg.naturalWidth || srcImg.width;
+  const sh = srcImg.naturalHeight || srcImg.height;
+  const scale = Math.min(1, maxSide / Math.max(sw, sh));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(sw * scale));
+  canvas.height = Math.max(1, Math.round(sh * scale));
+  canvas.getContext('2d').drawImage(srcImg, 0, 0, canvas.width, canvas.height);
+  const blob = await lib.removeBackground(canvas, {
+    output: { format: 'image/png', quality: 0.9 },
+    progress: (key, current, total) => {
+      if (onProgress) onProgress(key, total > 0 ? current / total : 0);
+    },
+  });
+  // Decode the blob back to an HTMLImageElement so the rest of the pipeline
+  // can use it as a drop-in for the original `img`.
+  const url = URL.createObjectURL(blob);
+  const out = await new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = reject;
+    im.src = url;
+  });
+  // Composite onto a white background so the bead-quantization sees solid colors
+  // for non-foreground regions, but with low chroma so they still get culled later
+  // by the heuristic mask if needed. We keep a separate alpha-aware version for
+  // cropping; here we punch transparent → pure white.
+  const flat = document.createElement('canvas');
+  flat.width = out.naturalWidth;
+  flat.height = out.naturalHeight;
+  const fc = flat.getContext('2d');
+  fc.fillStyle = '#ffffff';
+  fc.fillRect(0, 0, flat.width, flat.height);
+  fc.drawImage(out, 0, 0);
+  // Return both the flat-on-white image (for the existing pipeline) and a hint
+  // that bg has been removed so callers can skip heuristic.
+  const flatImg = await new Promise((resolve, reject) => {
+    flat.toBlob((b) => {
+      if (!b) return reject(new Error('toBlob failed'));
+      const u = URL.createObjectURL(b);
+      const im2 = new Image();
+      im2.onload = () => { URL.revokeObjectURL(u); URL.revokeObjectURL(url); resolve(im2); };
+      im2.onerror = reject;
+      im2.src = u;
+    }, 'image/png');
+  });
+  return flatImg;
+}
+
 function removeBackgroundHeuristic(srcData, w, h) {
   // Sample 4 corners + 4 edge midpoints
   const samples = [
@@ -2183,12 +2281,6 @@ function generateRealistic(img, size, bgRemove) {
 }
 
 function generateCute(img, size, bgRemove) {
-  const sharp = applyUSM(orig, blurred, 0.9);
-  const mag = computeSobelMag(sharp, w, w);
-  return edgeAwareDownsample(sharp, mag, w, 4, size, 70);
-}
-
-function generateCute(img, size, bgRemove) {
   // Lighter sharpen + edge-aware sample → reduce to ~10 colors for cartoon block look
   const { orig, blurred, w } = generateHiresPair(img, size, 4, 1.5);
   const masked = bgRemove ? (removeBackgroundHeuristic(orig, w, w) || orig) : orig;
@@ -2261,10 +2353,10 @@ function openCompareModal(img, size) {
   requestAnimationFrame(() => requestAnimationFrame(() => runComparison()));
 }
 
-function runComparison() {
-  const img = pendingImg, size = pendingSize;
+async function runComparison() {
+  const size = pendingSize;
   // suggestion
-  const complexity = estimateComplexity(img);
+  const complexity = estimateComplexity(pendingImg);
   const suggested = suggestUpSize(complexity, size);
   const sugBox = document.getElementById('size-suggestion');
   if (suggested) {
@@ -2282,8 +2374,51 @@ function runComparison() {
   }
 
   const bgRemove = document.getElementById('bg-remove-toggle')?.checked ?? true;
-  const realistic = generateRealistic(img, pendingSize, bgRemove);
-  const cute = generateCute(img, pendingSize, bgRemove);
+  const useML = bgRemove && (document.getElementById('bg-ml-toggle')?.checked ?? true);
+  const loadingTextEl = document.getElementById('compare-loading-text');
+  const progressWrap = document.getElementById('compare-progress');
+  const progressFill = document.getElementById('compare-progress-fill');
+  const progressText = document.getElementById('compare-progress-text');
+
+  // Default heuristic input.
+  let workImg = pendingImg;
+  let bgAlreadyRemoved = false;
+
+  if (useML) {
+    if (loadingTextEl) loadingTextEl.textContent = '🧠 AI 抠图模型加载中...（首次约 30s）';
+    if (progressWrap) progressWrap.hidden = false;
+    try {
+      let lastKey = '';
+      const masked = await mlRemoveBackground(pendingImg, (key, ratio) => {
+        if (key !== lastKey) {
+          lastKey = key;
+          if (loadingTextEl) {
+            loadingTextEl.textContent = key === 'fetch' || key === 'script'
+              ? '🧠 下载 AI 模型中...'
+              : '🧠 AI 抠图运算中...';
+          }
+        }
+        if (progressFill) progressFill.style.width = (Math.max(0, Math.min(1, ratio)) * 100).toFixed(0) + '%';
+        if (progressText) progressText.textContent = (Math.max(0, Math.min(1, ratio)) * 100).toFixed(0) + '%';
+      });
+      workImg = masked;
+      bgAlreadyRemoved = true;
+      if (progressFill) progressFill.style.width = '100%';
+      if (progressText) progressText.textContent = '100%';
+    } catch (err) {
+      console.warn('ML bg removal failed, falling back to heuristic', err);
+      showToast('AI 抠图未能加载，已回退到启发式抠图', 'warn');
+    }
+    if (progressWrap) progressWrap.hidden = true;
+  }
+
+  if (loadingTextEl) loadingTextEl.textContent = '⚙️ 像素化 + 色彩匹配中...';
+  // Yield once so the UI can repaint the new label before heavy synchronous work.
+  await new Promise(r => requestAnimationFrame(r));
+
+  const heuristicBg = bgRemove && !bgAlreadyRemoved;
+  const realistic = generateRealistic(workImg, pendingSize, heuristicBg);
+  const cute = generateCute(workImg, pendingSize, heuristicBg);
   pendingResults = { realistic, cute };
   drawComparePreview(document.getElementById('canvas-realistic'), realistic, pendingSize);
   drawComparePreview(document.getElementById('canvas-cute'), cute, pendingSize);
