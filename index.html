@@ -189,6 +189,29 @@
   .upload-icon { font-size: 36px; margin-bottom: 8px; }
   .upload-area .ttl { font-weight: 700; color: var(--c-secondary); font-size: 14px; }
   .upload-area .hint { font-size: 11px; color: var(--c-text-3); margin-top: 4px; }
+  .ai-preflight {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 38px;
+    align-items: center;
+    column-gap: 12px;
+    margin: -2px 0 14px;
+    padding: 10px 12px;
+    background: var(--c-toolbar-bg);
+    border-radius: var(--r-md);
+    text-align: left;
+    border: 1px solid var(--c-border);
+    cursor: pointer;
+  }
+  .ai-preflight .ai-copy { min-width: 0; }
+  .ai-preflight .ai-title-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .ai-preflight .ai-title { font-size: 13px; font-weight: 700; color: var(--c-text); line-height: 1.2; }
+  .ai-preflight .ai-tag { padding: 2px 6px; border-radius: 999px; background: rgba(255,143,171,.16); color: var(--c-secondary); font-size: 10px; font-weight: 800; line-height: 1.4; flex: 0 0 auto; }
+  .ai-preflight .ai-hint { font-size: 11px; color: var(--c-text-2); margin-top: 4px; line-height: 1.45; }
+  .ai-preflight input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; padding: 0; appearance: none; -webkit-appearance: none; pointer-events: none; }
+  .ai-switch { display: block; width: 38px; height: 22px; border-radius: 99px; background: #d0d4d9; position: relative; transition: .2s; border: 0; outline: 0; box-shadow: none; justify-self: end; }
+  .ai-switch::after { content: ''; position: absolute; width: 18px; height: 18px; top: 2px; left: 2px; background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: .2s; }
+  .ai-preflight input:checked + .ai-switch { background: var(--c-secondary); }
+  .ai-preflight input:checked + .ai-switch::after { transform: translateX(16px); }
   .size-row { display: flex; gap: 8px; margin-bottom: 14px; }
   .size-btn {
     flex: 1; padding: 10px 6px; border: 1px solid var(--c-border);
@@ -808,60 +831,7 @@
   .palette-scroll {
     flex: 1;
     overflow-y: auto;
-    padding: 0 14px 14px;
-  }
-  .family-block { margin-top: 10px; }
-  .family-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    padding: 6px 0;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--c-text);
-  }
-  .family-head .l { display: flex; align-items: center; gap: 8px; }
-  .family-head .swatch {
-    width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
-    border: 1px solid var(--c-border);
-  }
-  .family-head .count { color: var(--c-text-3); font-weight: 500; font-size: 11px; }
-  .family-head .fh-right { display: flex; gap: 8px; align-items: center; }
-  .family-head .caret {
-    width: 12px; height: 12px;
-    border-right: 1.5px solid var(--c-text-3);
-    border-bottom: 1.5px solid var(--c-text-3);
-    transform: rotate(-45deg);
-    transition: transform 0.2s;
-  }
-  .family-block.open .family-head .caret { transform: rotate(45deg); }
-  .family-grid {
-    display: none;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 6px;
-    padding-top: 6px;
-  }
-  .family-block.open .family-grid { display: grid; }
-  .color-dot {
-    width: 100%;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 2px solid var(--c-paper);
-    box-shadow: 0 0 0 1px var(--c-border);
-    transition: transform 0.1s;
-  }
-  .color-dot:hover { transform: scale(1.15); }
-  .color-dot.active { box-shadow: 0 0 0 2px var(--c-secondary); transform: scale(1.1); }
-  .color-dot.special { background-image: linear-gradient(135deg, var(--c) 0%, var(--c) 50%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0.55) 60%, var(--c) 60%) !important; }
-  .family-block[data-family="special"] .family-head .l::after { content: '✨'; font-size: 11px; }
-
-  .materials {
-    padding: 12px 14px;
-    border-top: 1px solid var(--c-border);
-    background: var(--c-paper);
-    flex-shrink: 0;
+    padding: 0 14shrink: 0;
     max-height: 30vh;
     overflow-y: auto;
   }
@@ -897,6 +867,67 @@
     margin-bottom: 8px;
     padding: 8px 10px;
     background: rgba(255, 200, 87, 0.18);
+    border: 1px solid rgba(255, 200, 87, 0.5);
+    border-radius: var(--r-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .merge-bar .merge-msg { color: #92400e; line-height: 1.35; }
+  .merge-bar .merge-btn {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border-radius: var(--r-sm);
+    background: var(--c-primary);
+    color: #fff;
+    border: none;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .merge-bar .merge-btn:hover { background: var(--c-secondary); }
+  .empty-hint { font-size: 12px; color: var(--c-text-3); text-align: center; padding: 16px 0; }
+
+  /* Export */
+  #v-export { background: #e5e7eb; padding: 24px; overflow: auto; flex-direction: column; align-items: center; }
+  @media (prefers-color-scheme: dark) {
+    #v-export { background: #0a0c10; }
+  }
+  .a4 {
+    width: 100%;
+    max-width: 700px;
+    background: white;
+    color: #1f2937;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+    padding: 36px;
+    border-radius: 4px;
+    margin: 0 auto 24px;
+  }
+  #export-pages { display: flex; flex-direction: column; align-items: center; }
+  .a4 .head {
+    border-bottom: 2px solid #1f2937;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .a4 h1 { margin: 0 0 4px; font-size: 22px; color: #1f2937; }
+  .a4 .meta { color: #6b7280; font-size: 12px; }
+  .a4 .pattern-wrap { text-align: center; margin-bottom: 24px; }
+  .a4 .pattern-wrap canvas {
+    max-width: 100%;
+    image-rendering: pixelated;
+    border: 1px solid #d1d5db;
+    background: white;
+  }
+  .a4 h3 { font-size: 14px; margin: 16px 0 8px; padding-left: 8px; border-left: 4px solid var(--c-secondary); color: #1f2937; }
+  .a4 table { width: 100%; border-colckground: rgba(255, 200, 87, 0.18);
     border: 1px solid rgba(255, 200, 87, 0.5);
     border-radius: var(--r-sm);
     display: flex;
@@ -1013,7 +1044,7 @@
       page-break-inside: avoid;
     }
     .a4 + .a4 { page-break-before: always; }
-    .a4 .pattern-wrap canvas { max-width: 100%; height: auto !important; border: 1px solid #1f2937 !important; }
+    .a4 .pattern-wrap canvas { max-width: 100%; max-height: 235mm; width: auto !important; height: auto !important; border: 1px solid #1f2937 !important; object-fit: contain; }
     .export-legend {
       grid-template-columns: repeat(4, 1fr);
       font-size: 10px;
@@ -1084,6 +1115,10 @@
     font-size: 11px; font-weight: 700; cursor: pointer;
     font-family: inherit;
   }
+  .suggestion-size-options { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; align-items: center; }
+  .suggestion-size-options .suggestion-mini { padding: 4px 10px; border: 1px solid var(--c-border); border-radius: 999px; background: var(--c-paper); color: var(--c-text); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .suggestion-size-options .suggestion-mini.active { background: var(--c-active-bg); border-color: var(--c-secondary); color: var(--c-secondary); cursor: default; }
+  .suggestion-size-options .suggestion-mini.undo { background: rgba(255,143,171,.12); color: var(--c-secondary); border-color: rgba(255,143,171,.35); }
   .compare-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1418,6 +1453,17 @@
         <div class="hint">支持 JPG / PNG · 内置最近邻色彩匹配</div>
         <input type="file" id="upload-input" accept="image/*" hidden />
       </div>
+      <label class="ai-preflight" id="ai-preflight">
+        <span class="ai-copy">
+          <span class="ai-title-row">
+            <span class="ai-title">AI 自动抠图</span>
+            <span class="ai-tag" id="ai-upload-tag">可选</span>
+          </span>
+          <span class="ai-hint" id="ai-upload-hint">关闭后将保留原图背景，直接生成拼豆图。</span>
+        </span>
+        <input type="checkbox" id="ai-upload-toggle" />
+        <span class="ai-switch"></span>
+      </label>
       <div class="size-row">
         <button class="size-btn" data-size="29"><span class="n">29²</span><span class="lbl">~7.5cm</span></button>
         <button class="size-btn active" data-size="38"><span class="n">38²</span><span class="lbl">~10cm</span></button>
@@ -1630,11 +1676,11 @@
 <div class="modal-backdrop" id="compare-modal">
   <div class="modal">
     <div class="modal-head">
-      <h3>AI 生成完毕！请选择风格</h3>
+      <h3 id="compare-title">准备生成中...</h3>
       <button class="modal-close" id="compare-close" title="关闭">×</button>
     </div>
     <div class="modal-body" id="compare-body">
-      <div class="modal-sub">已为你生成两种拼豆图纸方案，挑一个继续编辑</div>
+      <div class="modal-sub" id="compare-sub">正在准备图片，请稍等</div>
       <div class="compare-loading" id="compare-loading">
         <div class="spin"></div>
         <div id="compare-loading-text">正在生成两种风格...</div>
@@ -1648,6 +1694,7 @@
           <span class="ico">💡</span>
           <span id="suggestion-text"></span>
           <button class="suggestion-btn" id="suggestion-apply">使用 <span id="suggestion-size"></span>×<span id="suggestion-size-2"></span></button>
+          <span class="suggestion-size-options" id="suggestion-size-options"></span>
         </div>
         <div class="bg-toggle">
           <label class="bg-toggle-label">
@@ -1658,7 +1705,7 @@
           <label class="bg-toggle-label" id="ml-toggle-wrap" style="margin-left:12px">
             <input type="checkbox" id="bg-ml-toggle" checked />
             <span class="bg-toggle-track"><span class="bg-toggle-knob"></span></span>
-            <span class="bg-toggle-text">🧠 AI 抠图（首次约 30s）</span>
+            <span class="bg-toggle-text">🧠 AI 抠图（首次约 40MB）</span>
           </label>
           <span class="bg-toggle-hint">主体清晰的照片效果最好；如有残留可关闭</span>
         </div>
@@ -1785,6 +1832,7 @@ const state = {
   history: [],
   historyIdx: -1,
   brand: 'MARD',
+  sourceAiRemove: true,
 };
 
 function makeGrid(size) {
@@ -1795,6 +1843,9 @@ function cloneGrid(g) {
 }
 /* ============== Draft (localStorage) ============== */
 const DRAFT_KEY = 'pixelbead.draft.v1';
+const AI_PREF_KEY = 'pixelbead.aiRemove.enabled.v1';
+const IMGLY_MODEL_VERSION = 'imgly-bg-small-1.7.0';
+const IMGLY_MODEL_CACHE_KEY = 'pixelbead.imgly.modelVersion';
 let draftDirty = false;
 let draftSaveTimer = null;
 function isGridEmpty(g) {
@@ -1945,11 +1996,20 @@ async function changeEditorSize(newSize) {
   try {
     if (state.sourceImage) {
       const img = state.sourceImage;
-      const bgRemove = !!state.sourceBgRemove;
+      const bgRemove = !!state.sourceBgRemove && !state.sourceAiRemove;
       const mode = state.sourceMode || 'realistic';
-      const grid = mode === 'cute'
-        ? generateCute(img, newSize, bgRemove)
-        : generateRealistic(img, newSize, bgRemove);
+      let grid;
+      try {
+        grid = mode === 'cute'
+          ? generateCute(img, newSize, bgRemove)
+          : generateRealistic(img, newSize, bgRemove);
+      } catch (err) {
+        console.warn('resize re-pixelize failed, retrying without bg removal', err);
+        grid = mode === 'cute'
+          ? generateCute(img, newSize, false)
+          : generateRealistic(img, newSize, false);
+        showToast('重新像素化遇到背景处理问题，已保留原背景继续生成', 'warn');
+      }
       state.size = newSize;
       state.grid = grid;
       state.history = [cloneGrid(grid)];
@@ -2010,13 +2070,32 @@ function showToast(msg, kind) {
     });
     document.body.appendChild(el);
   }
-  el.textContent = msg;
+  el.innerHTML = '';
+  if (typeof msg === 'object' && msg) {
+    const span = document.createElement('span');
+    span.textContent = msg.text || '';
+    el.appendChild(span);
+    if (msg.actionText && typeof msg.onAction === 'function') {
+      const btn = document.createElement('button');
+      btn.textContent = msg.actionText;
+      Object.assign(btn.style, { marginLeft: '12px', padding: '3px 9px', border: '1px solid rgba(255,255,255,.55)', borderRadius: '999px', background: 'rgba(255,255,255,.14)', color: '#fff', font: 'inherit', fontSize: '12px', fontWeight: '800', cursor: 'pointer' });
+      btn.onclick = (e) => { e.stopPropagation(); msg.onAction(); };
+      el.appendChild(btn);
+      el.style.pointerEvents = 'auto';
+    } else {
+      el.style.pointerEvents = 'none';
+    }
+  } else {
+    el.textContent = msg;
+    el.style.pointerEvents = 'none';
+  }
   if (kind === 'warn') el.style.background = '#b45309';
   else if (kind === 'error') el.style.background = '#b91c1c';
   else el.style.background = 'rgba(31,41,55,0.94)';
   requestAnimationFrame(() => { el.style.opacity = '1'; el.style.top = '32px'; });
   clearTimeout(el._t);
-  el._t = setTimeout(() => { el.style.opacity = '0'; el.style.top = '24px'; }, 2400);
+  const duration = (typeof msg === 'object' && msg.duration) ? msg.duration : 2400;
+  el._t = setTimeout(() => { el.style.opacity = '0'; el.style.top = '24px'; el.style.pointerEvents = 'none'; }, duration);
 }
 
 /* Brand / palette switcher. Switches PALETTE at runtime, remaps existing
@@ -2080,6 +2159,20 @@ if (brandSel) {
     const ok = setBrand(v);
     if (!ok) e.target.value = state.brand; // revert UI on failure
   });
+}
+
+const aiUploadToggle = document.getElementById('ai-upload-toggle');
+if (aiUploadToggle) {
+  try {
+    const saved = localStorage.getItem(AI_PREF_KEY);
+    if (saved !== null) aiUploadToggle.checked = saved === '1';
+  } catch (e) {}
+  aiUploadToggle.addEventListener('change', () => {
+    try { localStorage.setItem(AI_PREF_KEY, aiUploadToggle.checked ? '1' : '0'); } catch (e) {}
+    updateAiUploadHint();
+    showToast(aiUploadToggle.checked ? '已开启 AI 抠图' : '已关闭 AI 抠图，将直接像素化');
+  });
+  updateAiUploadHint();
 }
 
 document.querySelectorAll('.size-btn').forEach(b => b.addEventListener('click', () => {
@@ -2192,14 +2285,14 @@ function ensureCropper() {
   return cropperPromise;
 }
 
-async function openCropModal(srcImg, size) {
+async function openCropModal(srcImg, size, options = {}) {
   let Cropper;
   try {
     Cropper = await ensureCropper();
   } catch (e) {
     console.warn('Cropper failed to load, skipping crop step', e);
     showToast('裁切组件加载失败，已跳过裁切直接转图', 'warn');
-    openCompareModal(srcImg, size);
+    openCompareModal(srcImg, size, options);
     return;
   }
   const modal = document.getElementById('crop-modal');
@@ -2228,7 +2321,7 @@ async function openCropModal(srcImg, size) {
   } catch (e) {
     console.warn('Cropper init failed', e);
     modal.classList.remove('open');
-    openCompareModal(srcImg, size);
+    openCompareModal(srcImg, size, options);
     return;
   }
   const cleanup = () => {
@@ -2238,7 +2331,7 @@ async function openCropModal(srcImg, size) {
   const close = () => cleanup();
   const skip = () => {
     cleanup();
-    openCompareModal(srcImg, size);
+    openCompareModal(srcImg, size, options);
   };
   const confirm = () => {
     let canvas;
@@ -2256,14 +2349,14 @@ async function openCropModal(srcImg, size) {
     }
     cleanup();
     canvas.toBlob((blob) => {
-      if (!blob) { openCompareModal(srcImg, size); return; }
+      if (!blob) { openCompareModal(srcImg, size, options); return; }
       const url = URL.createObjectURL(blob);
       const cropped = new Image();
       cropped.onload = () => {
         URL.revokeObjectURL(url);
-        openCompareModal(cropped, size);
+        openCompareModal(cropped, size, options);
       };
-      cropped.onerror = () => { openCompareModal(srcImg, size); };
+      cropped.onerror = () => { openCompareModal(srcImg, size, options); };
       cropped.src = url;
     }, 'image/png');
   };
@@ -2272,9 +2365,13 @@ async function openCropModal(srcImg, size) {
   document.getElementById('crop-confirm').onclick = confirm;
 }
 
+function shouldUseAiRemove() {
+  const el = document.getElementById('ai-upload-toggle');
+  return el ? el.checked : false;
+}
 function handleImageUpload(file, size) {
   const img = new Image();
-  img.onload = () => openCropModal(img, size);
+  img.onload = () => openCropModal(img, size, { aiRemove: shouldUseAiRemove() });
   img.src = URL.createObjectURL(file);
 }
 
@@ -2622,10 +2719,10 @@ function estimateComplexity(img) {
 }
 
 function suggestUpSize(complexity, currentSize) {
-  if (currentSize >= 58) return null;
-  if (complexity > 70 && currentSize < 58) return 58;
-  if (complexity > 40 && currentSize < 48) return 48;
-  return null;
+  if (complexity <= 40 || currentSize >= 58) return null;
+  const sizes = [29, 38, 48, 58];
+  const idx = sizes.indexOf(currentSize);
+  return idx >= 0 && idx < sizes.length - 1 ? sizes[idx + 1] : null;
 }
 
 function countUnique(grid) {
@@ -2643,11 +2740,122 @@ function countBeads(grid) {
 let pendingImg = null;
 let pendingSize = 29;
 let pendingResults = null;
+let pendingAiRemove = true;
+let preSuggestSnapshot = null;
+let currentSuggestedSize = null;
+let pipelineStage = 'image:loading';
+let compareRunId = 0;
+let compareSlowTimer = null;
 
-function openCompareModal(img, size) {
+function setCompareStage(stage, detail) {
+  pipelineStage = stage || 'image:loading';
+  const title = document.getElementById('compare-title');
+  const sub = document.getElementById('compare-sub');
+  const loadingText = document.getElementById('compare-loading-text');
+  const map = {
+    'image:loading': ['准备生成中...', '正在读取图片并准备处理', '正在读取图片...'],
+    preparing: ['准备生成中...', '正在读取图片并准备处理', '正在读取图片...'],
+    'model:downloading': ['正在下载 AI 模型...', '首次使用需下载模型，之后会自动缓存', '正在下载 AI 模型...'],
+    'ai:matting': ['AI 抠图处理中...', '正在识别主体并移除背景', 'AI 抠图处理中...'],
+    'pixel:generating': ['正在生成拼豆方案...', '正在分析颜色并生成图纸', '正在生成拼豆方案...'],
+    done: ['生成完成，请选择风格', '已生成两种拼豆图纸方案', ''],
+    fallback: ['正在生成拼豆方案...', '正在分析颜色并生成图纸', '正在生成拼豆方案...'],
+  };
+  const v = map[pipelineStage] || map['image:loading'];
+  if (title) title.textContent = v[0];
+  if (sub) sub.textContent = detail || v[1];
+  if (loadingText) loadingText.textContent = v[2];
+  clearTimeout(compareSlowTimer);
+  if (pipelineStage !== 'done') {
+    compareSlowTimer = setTimeout(() => {
+      if (compareRunId && pipelineStage !== 'done') {
+        const s = document.getElementById('compare-sub');
+        if (s) s.textContent = '处理时间较长，请稍候...';
+      }
+    }, 15000);
+  }
+}
+function isCompareRunActive(runId) {
+  const modal = document.getElementById('compare-modal');
+  return runId === compareRunId && !!pendingImg && modal?.classList.contains('open');
+}
+function cancelCompareRun() {
+  compareRunId++;
+  clearTimeout(compareSlowTimer);
+  document.getElementById('compare-modal').classList.remove('open');
+  pendingImg = null;
+  pendingResults = null;
+  preSuggestSnapshot = null;
+}
+function markModelCached() {
+  try { localStorage.setItem(IMGLY_MODEL_CACHE_KEY, IMGLY_MODEL_VERSION); } catch (e) {}
+  updateAiUploadHint();
+}
+function isModelCached() {
+  try { return localStorage.getItem(IMGLY_MODEL_CACHE_KEY) === IMGLY_MODEL_VERSION; } catch (e) { return false; }
+}
+function updateAiUploadHint() {
+  const hint = document.getElementById('ai-upload-hint');
+  if (!hint) return;
+  const tag = document.getElementById('ai-upload-tag');
+  const toggle = document.getElementById('ai-upload-toggle');
+  const enabled = !!toggle?.checked;
+  if (!enabled) {
+    hint.textContent = '关闭后将保留原图背景，直接生成拼豆图。';
+    if (tag) tag.textContent = '可选';
+  } else if (isModelCached()) {
+    hint.textContent = '模型已缓存，可直接使用。';
+    if (tag) tag.textContent = '推荐';
+  } else {
+    const cachedVersion = (() => { try { return localStorage.getItem(IMGLY_MODEL_CACHE_KEY); } catch (e) { return null; } })();
+    hint.textContent = cachedVersion ? 'AI 模型有更新，需要重新下载。' : '适合人物、宠物等主体图片。首次需下载约 40MB，之后自动缓存。';
+    if (tag) tag.textContent = '推荐';
+  }
+}
+function captureEditorSnapshot() {
+  return {
+    size: state.size,
+    grid: cloneGrid(state.grid),
+    history: state.history.map(cloneGrid),
+    historyIdx: state.historyIdx,
+    sourceImage: state.sourceImage,
+    sourceMode: state.sourceMode,
+    sourceBgRemove: state.sourceBgRemove,
+    sourceAiRemove: state.sourceAiRemove,
+    brand: state.brand,
+  };
+}
+function restoreEditorSnapshot(snap) {
+  if (!snap) return;
+  state.size = snap.size;
+  state.grid = cloneGrid(snap.grid);
+  state.history = snap.history.map(cloneGrid);
+  state.historyIdx = snap.historyIdx;
+  state.sourceImage = snap.sourceImage;
+  state.sourceMode = snap.sourceMode;
+  state.sourceBgRemove = snap.sourceBgRemove;
+  state.sourceAiRemove = snap.sourceAiRemove;
+  state.brand = snap.brand || state.brand;
+  document.getElementById('m-size').textContent = `${state.size}×${state.size}`;
+  syncEditorSizeUI();
+  fitCanvas();
+  renderCanvas();
+  renderMaterials();
+  refreshActionBar();
+  showToast('已撤销到上一个画布 ✓');
+}
+
+function openCompareModal(img, size, options = {}) {
   pendingImg = img;
   pendingSize = size;
   pendingResults = null;
+  pendingAiRemove = options.aiRemove ?? false;
+  const bgToggle = document.getElementById('bg-remove-toggle');
+  if (bgToggle && !pendingAiRemove) bgToggle.checked = false;
+  const mlToggle = document.getElementById('bg-ml-toggle');
+  if (mlToggle) mlToggle.checked = pendingAiRemove;
+  const runId = ++compareRunId;
+  setCompareStage('image:loading');
   const modal = document.getElementById('compare-modal');
   const loading = document.getElementById('compare-loading');
   const content = document.getElementById('compare-content');
@@ -2655,31 +2863,90 @@ function openCompareModal(img, size) {
   content.hidden = true;
   modal.classList.add('open');
   // run in next frame so modal paints first
-  requestAnimationFrame(() => requestAnimationFrame(() => runComparison()));
+  requestAnimationFrame(() => requestAnimationFrame(() => runComparison(runId)));
 }
 
-async function runComparison() {
+function startSuggestionResize(targetSize) {
+  if (!targetSize || targetSize === pendingSize) return;
+  preSuggestSnapshot = pendingResults ? {
+    pendingSize,
+    pendingResults: { realistic: cloneGrid(pendingResults.realistic), cute: cloneGrid(pendingResults.cute) },
+    pendingImg,
+    pendingAiRemove
+  } : preSuggestSnapshot;
+  const btn = document.getElementById('suggestion-apply');
+  if (btn) { btn.disabled = true; btn.dataset.oldText = btn.textContent; btn.textContent = '正在切换...'; }
+  showToast(`正在切换到 ${targetSize}×${targetSize}...`);
+  pendingSize = targetSize;
+  document.getElementById('compare-loading').hidden = false;
+  document.getElementById('compare-content').hidden = true;
+  const rid = compareRunId;
+  if (!pendingAiRemove) {
+    requestAnimationFrame(() => requestAnimationFrame(() => runPixelOnlyResize(targetSize, rid)));
+  } else {
+    requestAnimationFrame(() => requestAnimationFrame(() => runComparison(rid)));
+  }
+}
+function renderSizeOptions(currentSize) {
+  const wrap = document.getElementById('suggestion-size-options');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  [29, 38, 48, 58].forEach(sz => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'suggestion-mini' + (sz === currentSize ? ' active' : '');
+    b.textContent = `${sz}×${sz}${sz === currentSuggestedSize ? ' 推荐' : ''}`;
+    b.disabled = sz === currentSize;
+    b.onclick = (e) => { e.stopPropagation(); startSuggestionResize(sz); };
+    wrap.appendChild(b);
+  });
+  if (preSuggestSnapshot?.pendingResults) {
+    const u = document.createElement('button');
+    u.type = 'button';
+    u.className = 'suggestion-mini undo';
+    u.textContent = `撤销到 ${preSuggestSnapshot.pendingSize}×${preSuggestSnapshot.pendingSize}`;
+    u.onclick = (e) => { e.stopPropagation(); restorePendingSuggestSnapshot(); };
+    wrap.appendChild(u);
+  }
+}
+function restorePendingSuggestSnapshot() {
+  const prev = preSuggestSnapshot;
+  if (!prev?.pendingResults) return;
+  pendingSize = prev.pendingSize;
+  pendingResults = { realistic: cloneGrid(prev.pendingResults.realistic), cute: cloneGrid(prev.pendingResults.cute) };
+  drawComparePreview(document.getElementById('canvas-realistic'), pendingResults.realistic, pendingSize);
+  drawComparePreview(document.getElementById('canvas-cute'), pendingResults.cute, pendingSize);
+  document.getElementById('stats-realistic').textContent = `约需 ${countUnique(pendingResults.realistic)} 种颜色 · ${countBeads(pendingResults.realistic)} 颗豆子`;
+  document.getElementById('stats-cute').textContent = `约需 ${countUnique(pendingResults.cute)} 种颜色 · ${countBeads(pendingResults.cute)} 颗豆子`;
+  preSuggestSnapshot = null;
+  renderSizeOptions(pendingSize);
+  showToast(`已恢复到 ${pendingSize}×${pendingSize}`);
+}
+
+async function runComparison(runId = compareRunId) {
+  if (!isCompareRunActive(runId)) return;
+  setCompareStage('image:loading');
   const size = pendingSize;
   // suggestion
   const complexity = estimateComplexity(pendingImg);
   const suggested = suggestUpSize(complexity, size);
+  currentSuggestedSize = suggested;
   const sugBox = document.getElementById('size-suggestion');
-  if (suggested) {
-    sugBox.hidden = false;
-    const reason = complexity > 70 ? '细节非常密集（如人像、五官）' : '细节较丰富';
-    document.getElementById('suggestion-text').textContent = `图片${reason}（复杂度 ${Math.round(complexity)}），${size}×${size}（约 ${(size*BEAD_MM/10).toFixed(1)}cm）容易丢失五官等关键特征，建议改为 ${suggested}×${suggested}（约 ${(suggested*BEAD_MM/10).toFixed(1)}cm）`;
-    document.getElementById('suggestion-size').textContent = suggested;
-    document.getElementById('suggestion-size-2').textContent = suggested;
-    document.getElementById('suggestion-apply').onclick = () => {
-      pendingSize = suggested;
-      runComparison();
-    };
-  } else {
-    sugBox.hidden = true;
-  }
+  if (sugBox) sugBox.hidden = false;
+  const reason = complexity > 70 ? '细节非常密集' : '细节较多';
+  document.getElementById('suggestion-text').textContent = suggested
+    ? `建议尝试更大画布：图片${reason}时，更大尺寸会更清晰，也可以保留当前尺寸。`
+    : `画布尺寸：可按需要切换尺寸，也可以保留当前尺寸。`;
+  const applyBtn = document.getElementById('suggestion-apply');
+  if (applyBtn) applyBtn.hidden = true;
+  const s1 = document.getElementById('suggestion-size');
+  const s2 = document.getElementById('suggestion-size-2');
+  if (s1) s1.textContent = suggested || '';
+  if (s2) s2.textContent = suggested || '';
+  renderSizeOptions(size);
 
   const bgRemove = document.getElementById('bg-remove-toggle')?.checked ?? true;
-  const useML = bgRemove && (document.getElementById('bg-ml-toggle')?.checked ?? true);
+  const useML = bgRemove && pendingAiRemove && (document.getElementById('bg-ml-toggle')?.checked ?? true);
   const loadingTextEl = document.getElementById('compare-loading-text');
   const progressWrap = document.getElementById('compare-progress');
   const progressFill = document.getElementById('compare-progress-fill');
@@ -2690,25 +2957,21 @@ async function runComparison() {
   let bgAlreadyRemoved = false;
 
   if (useML) {
-    if (loadingTextEl) loadingTextEl.textContent = '🧠 AI 抠图模型加载中...（首次约 30s）';
+    setCompareStage(isModelCached() ? 'ai:matting' : 'model:downloading');
     if (progressWrap) progressWrap.hidden = false;
     if (progressFill) progressFill.style.width = '0%';
     if (progressText) progressText.textContent = '0%';
     try {
       const phaseLabel = (key) => {
-        if (!key) return '🧠 AI 抠图中...';
-        if (key === 'script' || key.startsWith('fetch')) return '📥 下载 AI 模型中...';
-        if (key === 'compute:decode') return '🖼️ 解码原图...';
-        if (key === 'compute:inference') return '🧠 AI 推理中（发丝级）...';
-        if (key === 'compute:mask') return '✂️ 应用前景蒙版...';
-        if (key === 'compute:encode') return '📦 编码输出 PNG...';
-        return '🧠 ' + key;
+        if (key === 'script' || key.startsWith('fetch')) setCompareStage('model:downloading');
+        else setCompareStage('ai:matting');
+        return null;
       };
       let lastKey = '';
       const masked = await mlRemoveBackground(pendingImg, (key, ratio) => {
         if (key !== lastKey) {
           lastKey = key;
-          if (loadingTextEl) loadingTextEl.textContent = phaseLabel(key);
+          phaseLabel(key);
         }
         const pct = (Math.max(0, Math.min(1, ratio)) * 100).toFixed(0);
         if (progressFill) progressFill.style.width = pct + '%';
@@ -2716,6 +2979,7 @@ async function runComparison() {
       });
       workImg = masked;
       bgAlreadyRemoved = true;
+      markModelCached();
       if (progressFill) progressFill.style.width = '100%';
       if (progressText) progressText.textContent = '100%';
     } catch (err) {
@@ -2724,25 +2988,139 @@ async function runComparison() {
       const short = reason.length > 80 ? reason.slice(0, 80) + '...' : reason;
       showToast('AI 抠图失败，回退启发式 · ' + short, 'warn');
       // Also update loading text so the failure is visible if toast was missed.
+      setCompareStage('fallback');
       if (loadingTextEl) loadingTextEl.textContent = '⚠️ AI 抠图: ' + short;
     }
     if (progressWrap) progressWrap.hidden = true;
   }
 
-  if (loadingTextEl) loadingTextEl.textContent = '⚙️ 像素化 + 色彩匹配中...';
+  if (!isCompareRunActive(runId)) return;
+  setCompareStage('pixel:generating');
   // Yield once so the UI can repaint the new label before heavy synchronous work.
   await new Promise(r => requestAnimationFrame(r));
+  if (!isCompareRunActive(runId)) return;
 
   const heuristicBg = bgRemove && !bgAlreadyRemoved;
-  const realistic = generateRealistic(workImg, pendingSize, heuristicBg);
-  const cute = generateCute(workImg, pendingSize, heuristicBg);
+  let realistic, cute;
+  try {
+    realistic = generateRealistic(workImg, pendingSize, heuristicBg);
+    await new Promise(r => requestAnimationFrame(r));
+    if (!isCompareRunActive(runId)) return;
+    // Q 版从已生成的写实网格做调色板简化，避免在 AI off / 放大重算路径重复跑一遍重图像管线导致卡住。
+    const cuteTarget = Math.min(12, Math.max(6, Math.round(pendingSize * pendingSize / 80)));
+    cute = reducePaletteToTopN(realistic, pendingSize, cuteTarget);
+  } catch (err) {
+    console.warn('pixel generation failed, retrying without bg removal', err);
+    showToast('生成时背景处理卡住，已保留原背景重试', 'warn');
+    try {
+      await new Promise(r => requestAnimationFrame(r));
+      realistic = generateRealistic(workImg, pendingSize, false);
+      await new Promise(r => requestAnimationFrame(r));
+      if (!isCompareRunActive(runId)) return;
+      const cuteTarget = Math.min(12, Math.max(6, Math.round(pendingSize * pendingSize / 80)));
+      cute = reducePaletteToTopN(realistic, pendingSize, cuteTarget);
+    } catch (retryErr) {
+      console.error('pixel generation retry failed', retryErr);
+      showToast('切换失败，请重试', 'error');
+      const btn = document.getElementById('suggestion-apply');
+      if (btn) { btn.disabled = false; if (btn.dataset.oldText) { btn.textContent = btn.dataset.oldText; delete btn.dataset.oldText; } }
+      if (preSuggestSnapshot?.pendingResults) {
+        pendingSize = preSuggestSnapshot.pendingSize;
+        pendingResults = { realistic: cloneGrid(preSuggestSnapshot.pendingResults.realistic), cute: cloneGrid(preSuggestSnapshot.pendingResults.cute) };
+        preSuggestSnapshot = null;
+        document.getElementById('compare-loading').hidden = true;
+        document.getElementById('compare-content').hidden = false;
+      }
+      return;
+    }
+  }
+  if (!isCompareRunActive(runId)) return;
   pendingResults = { realistic, cute };
   drawComparePreview(document.getElementById('canvas-realistic'), realistic, pendingSize);
   drawComparePreview(document.getElementById('canvas-cute'), cute, pendingSize);
   document.getElementById('stats-realistic').textContent = `约需 ${countUnique(realistic)} 种颜色 · ${countBeads(realistic)} 颗豆子`;
   document.getElementById('stats-cute').textContent = `约需 ${countUnique(cute)} 种颜色 · ${countBeads(cute)} 颗豆子`;
+  setCompareStage('done');
+  clearTimeout(compareSlowTimer);
   document.getElementById('compare-loading').hidden = true;
   document.getElementById('compare-content').hidden = false;
+  const btn = document.getElementById('suggestion-apply');
+  if (btn) { btn.disabled = false; if (btn.dataset.oldText) { btn.textContent = btn.dataset.oldText; delete btn.dataset.oldText; } }
+  if (preSuggestSnapshot && preSuggestSnapshot.pendingResults && preSuggestSnapshot.pendingSize !== pendingSize) {
+    const prev = preSuggestSnapshot;
+    showToast({
+      text: `已切换到 ${pendingSize}×${pendingSize}，可撤销`,
+      actionText: '撤销放大',
+      duration: 8000,
+      onAction: () => {
+        pendingSize = prev.pendingSize;
+        pendingResults = { realistic: cloneGrid(prev.pendingResults.realistic), cute: cloneGrid(prev.pendingResults.cute) };
+        drawComparePreview(document.getElementById('canvas-realistic'), pendingResults.realistic, pendingSize);
+        drawComparePreview(document.getElementById('canvas-cute'), pendingResults.cute, pendingSize);
+        document.getElementById('stats-realistic').textContent = `约需 ${countUnique(pendingResults.realistic)} 种颜色 · ${countBeads(pendingResults.realistic)} 颗豆子`;
+        document.getElementById('stats-cute').textContent = `约需 ${countUnique(pendingResults.cute)} 种颜色 · ${countBeads(pendingResults.cute)} 颗豆子`;
+        preSuggestSnapshot = null;
+        showToast(`已恢复到 ${pendingSize}×${pendingSize}`);
+        requestAnimationFrame(() => runComparison(compareRunId));
+      }
+    });
+  }
+}
+
+async function runPixelOnlyResize(size, runId = compareRunId) {
+  if (!isCompareRunActive(runId)) return;
+  pendingSize = size;
+  setCompareStage('pixel:generating');
+  const progressWrap = document.getElementById('compare-progress');
+  if (progressWrap) progressWrap.hidden = true;
+  await new Promise(r => requestAnimationFrame(r));
+  if (!isCompareRunActive(runId)) return;
+  let realistic, cute;
+  try {
+    realistic = generateRealistic(pendingImg, size, false);
+    await new Promise(r => requestAnimationFrame(r));
+    if (!isCompareRunActive(runId)) return;
+    const cuteTarget = Math.min(12, Math.max(6, Math.round(size * size / 80)));
+    cute = reducePaletteToTopN(realistic, size, cuteTarget);
+  } catch (err) {
+    console.error('AI-off resize failed', err);
+    showToast('切换失败，请重试', 'error');
+    const btn = document.getElementById('suggestion-apply');
+    if (btn) { btn.disabled = false; if (btn.dataset.oldText) { btn.textContent = btn.dataset.oldText; delete btn.dataset.oldText; } }
+    if (preSuggestSnapshot?.pendingResults) {
+      pendingSize = preSuggestSnapshot.pendingSize;
+      pendingResults = { realistic: cloneGrid(preSuggestSnapshot.pendingResults.realistic), cute: cloneGrid(preSuggestSnapshot.pendingResults.cute) };
+      preSuggestSnapshot = null;
+      document.getElementById('compare-loading').hidden = true;
+      document.getElementById('compare-content').hidden = false;
+    }
+    return;
+  }
+  if (!isCompareRunActive(runId)) return;
+  pendingResults = { realistic, cute };
+  drawComparePreview(document.getElementById('canvas-realistic'), realistic, size);
+  drawComparePreview(document.getElementById('canvas-cute'), cute, size);
+  document.getElementById('stats-realistic').textContent = `约需 ${countUnique(realistic)} 种颜色 · ${countBeads(realistic)} 颗豆子`;
+  document.getElementById('stats-cute').textContent = `约需 ${countUnique(cute)} 种颜色 · ${countBeads(cute)} 颗豆子`;
+  setCompareStage('done');
+  clearTimeout(compareSlowTimer);
+  document.getElementById('compare-loading').hidden = true;
+  document.getElementById('compare-content').hidden = false;
+  const btn = document.getElementById('suggestion-apply');
+  if (btn) { btn.disabled = false; if (btn.dataset.oldText) { btn.textContent = btn.dataset.oldText; delete btn.dataset.oldText; } }
+  const sugBox = document.getElementById('size-suggestion');
+  if (sugBox) sugBox.hidden = false;
+  try { currentSuggestedSize = suggestUpSize(estimateComplexity(pendingImg), pendingSize); } catch (_) { currentSuggestedSize = null; }
+  renderSizeOptions(pendingSize);
+  if (preSuggestSnapshot && preSuggestSnapshot.pendingResults && preSuggestSnapshot.pendingSize !== pendingSize) {
+    const prev = preSuggestSnapshot;
+    showToast({
+      text: `已切换到 ${pendingSize}×${pendingSize}，可撤销`,
+      actionText: '撤销放大',
+      duration: 8000,
+      onAction: () => restorePendingSuggestSnapshot()
+    });
+  }
 }
 
 function drawComparePreview(canvas, grid, size) {
@@ -2773,15 +3151,17 @@ function pickStyle(mode) {
   state.history = [cloneGrid(grid)];
   state.historyIdx = 0;
   // Remember source so editor's size selector can re-pixelate
-  state.sourceImage = pendingImg;
+  state.sourceImage = pendingAiRemove ? null : pendingImg;
   state.sourceMode = mode;
-  state.sourceBgRemove = document.getElementById('bg-remove-toggle')?.checked ?? true;
+  state.sourceBgRemove = pendingAiRemove ? (document.getElementById('bg-remove-toggle')?.checked ?? true) : false;
+  state.sourceAiRemove = pendingAiRemove;
   syncEditorSizeUI();
   refreshActionBar();
   renderCanvas();
   renderMaterials();
   document.getElementById('compare-modal').classList.remove('open');
   switchView('editor');
+  preSuggestSnapshot = null;
   pendingImg = null; pendingResults = null;
 }
 
@@ -2795,12 +3175,10 @@ document.querySelectorAll('.compare-card').forEach(card => {
   });
 });
 document.getElementById('compare-close').addEventListener('click', () => {
-  document.getElementById('compare-modal').classList.remove('open');
-  pendingImg = null; pendingResults = null;
+  cancelCompareRun();
 });
 document.getElementById('compare-cancel').addEventListener('click', () => {
-  document.getElementById('compare-modal').classList.remove('open');
-  pendingImg = null; pendingResults = null;
+  cancelCompareRun();
   document.getElementById('upload-input').value = '';
   document.getElementById('upload-input').click();
 });
@@ -2808,7 +3186,14 @@ document.getElementById('bg-remove-toggle').addEventListener('change', () => {
   if (!pendingImg) return;
   document.getElementById('compare-loading').hidden = false;
   document.getElementById('compare-content').hidden = true;
-  requestAnimationFrame(() => requestAnimationFrame(() => runComparison()));
+  requestAnimationFrame(() => requestAnimationFrame(() => runComparison(compareRunId)));
+});
+document.getElementById('bg-ml-toggle').addEventListener('change', () => {
+  if (!pendingImg) return;
+  pendingAiRemove = document.getElementById('bg-ml-toggle')?.checked ?? true;
+  document.getElementById('compare-loading').hidden = false;
+  document.getElementById('compare-content').hidden = true;
+  requestAnimationFrame(() => requestAnimationFrame(() => runComparison(compareRunId)));
 });
 
 /* ============== Tooltip (portal) ============== */
@@ -3762,13 +4147,13 @@ function renderMaterials() {
 }
 
 /* ============== Export ============== */
-const CELLS_PER_PAGE = 30;
+const CELLS_PER_PAGE = 999;
 
 function drawPatternPage(canvasEl, opts) {
   const { rowStart, rowEnd, colStart, colEnd, colorIndex, beadStyle } = opts;
   const cols = colEnd - colStart;
   const rows = rowEnd - rowStart;
-  const px = 22;
+  const px = Math.max(9, Math.min(22, Math.floor((980 - AXIS_PX) / Math.max(cols, rows))));
   const W = cols * px + AXIS_PX;
   const H = rows * px + AXIS_PX;
   canvasEl.width = W;
@@ -3882,11 +4267,7 @@ function renderExport() {
         </div>
       </div>
       <div class="pattern-wrap"><canvas></canvas></div>
-      <div class="print-tip">${
-        isPaged
-          ? `本页是整图 ${rows}×${cols} 拼图中的第 (行 ${s.pr + 1}, 列 ${s.pc + 1}) 页。每格内数字对应末页色卡编号；拼接时以行/列号对齐。`
-          : `每格内数字对应下页色卡编号；行/列号沿画板上方与左侧。`
-      }</div>
+      <div class="print-tip">整张图纸已压缩到单页显示；每格内数字对应下页色卡编号，行/列号沿画板上方与左侧。</div>
     `;
     root.appendChild(page);
     const cv = page.querySelector('canvas');
