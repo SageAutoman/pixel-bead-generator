@@ -229,21 +229,56 @@
   .action-bar .grp { display: flex; gap: 4px; }
   .action-bar .sep { width: 1px; height: 20px; background: var(--c-border); }
   .ab-btn {
-    padding: 6px 10px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
     background: transparent;
     border: 1px solid var(--c-border);
     border-radius: var(--r-sm);
     cursor: pointer;
-    font-size: 12px;
+    font-size: 16px;
+    line-height: 1;
     color: var(--c-text);
     font-family: inherit;
-    white-space: nowrap;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
+    transition: background 120ms ease, border-color 120ms ease, transform 80ms ease;
   }
-  .ab-btn:hover:not(:disabled) { background: var(--c-toolbar-bg); }
+  .ab-btn:hover:not(:disabled) { background: var(--c-toolbar-bg); border-color: var(--c-primary); }
+  .ab-btn:active:not(:disabled) { transform: scale(0.94); }
   .ab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ab-btn.wide { width: auto; padding: 0 12px; gap: 6px; font-size: 13px; }
+
+  /* Unified tooltip for any button using [data-tip] */
+  [data-tip] { position: relative; }
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 6px);
+    transform: translateX(-50%) translateY(-2px);
+    background: rgba(29, 20, 20, 0.92);
+    color: #fff;
+    font-size: 11px;
+    line-height: 1.3;
+    padding: 5px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 120ms ease 60ms, transform 120ms ease 60ms;
+    z-index: 9999;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  }
+  [data-tip]:hover::after,
+  [data-tip]:focus-visible::after { opacity: 1; transform: translateX(-50%) translateY(0); }
+  [data-tip][data-tip-side="right"]::after {
+    left: calc(100% + 6px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-2px);
+  }
+  [data-tip][data-tip-side="right"]:hover::after { transform: translateY(-50%) translateX(0); }
   .ab-meta {
     margin-left: auto;
     font-size: 11px;
@@ -870,7 +905,8 @@
     /* Action bar: compact */
     .action-bar { padding: 6px 8px; gap: 4px; }
     .action-bar .ab-meta { display: none; }
-    .ab-btn { font-size: 11px; padding: 5px 8px; }
+    .ab-btn { width: 32px; height: 32px; font-size: 14px; }
+    .ab-btn.wide { padding: 0 10px; font-size: 12px; }
 
     /* Canvas area: full screen above floating toolbar */
     .canvas-area { flex: 1; padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
@@ -1004,40 +1040,40 @@
   <!-- Editor -->
   <section id="v-editor" class="view">
     <div class="toolbar" id="toolbar">
-      <button class="tool active" data-tool="brush" title="画笔 B">✏️</button>
-      <button class="tool" data-tool="eraser" title="橡皮 E">🧽</button>
-      <button class="tool" data-tool="fill" title="油漆桶 G">🪣</button>
-      <button class="tool" data-tool="picker" title="取色器 I">💧</button>
+      <button class="tool active" data-tool="brush" data-tip="画笔 (B)" data-tip-side="right">✏️</button>
+      <button class="tool" data-tool="eraser" data-tip="橡皮 (E)" data-tip-side="right">🧽</button>
+      <button class="tool" data-tool="fill" data-tip="油漆桶 (G)" data-tip-side="right">🪣</button>
+      <button class="tool" data-tool="picker" data-tip="取色器 (I)" data-tip-side="right">💧</button>
       <div class="tool-divider"></div>
-      <button class="tool" data-tool="pan" title="平移 H (空格)">🖐️</button>
-      <button class="tool" data-act="zoom-in" title="放大">🔍+</button>
-      <button class="tool" data-act="zoom-out" title="缩小">🔍-</button>
-      <button class="tool" data-act="fit" title="适配窗口">⛶</button>
+      <button class="tool" data-tool="pan" data-tip="平移 (H/空格)" data-tip-side="right">🖐️</button>
+      <button class="tool" data-act="zoom-in" data-tip="放大" data-tip-side="right">🔍+</button>
+      <button class="tool" data-act="zoom-out" data-tip="缩小" data-tip-side="right">🔍-</button>
+      <button class="tool" data-act="fit" data-tip="适配窗口" data-tip-side="right">⛶</button>
       <div class="tool-divider"></div>
-      <button class="tool" data-act="outline" title="一键描边">🖼️</button>
+      <button class="tool" data-act="outline" data-tip="一键描边" data-tip-side="right">🖼️</button>
       <div class="tool-spacer"></div>
     </div>
 
     <div class="canvas-area">
       <div class="action-bar">
         <div class="grp">
-          <button class="ab-btn" id="btn-new">📄 新建</button>
-          <button class="ab-btn" id="btn-reupload">📤 重新上传</button>
+          <button class="ab-btn" id="btn-new" data-tip="新建">📄</button>
+          <button class="ab-btn" id="btn-reupload" data-tip="重新上传">📤</button>
         </div>
         <div class="sep"></div>
         <div class="grp">
-          <button class="ab-btn" id="btn-undo" disabled>↶ 撤销</button>
-          <button class="ab-btn" id="btn-redo" disabled>↷ 重做</button>
+          <button class="ab-btn" id="btn-undo" data-tip="撤销 (Ctrl+Z)" disabled>↶</button>
+          <button class="ab-btn" id="btn-redo" data-tip="重做 (Ctrl+Shift+Z)" disabled>↷</button>
         </div>
         <div class="sep"></div>
         <div class="grp">
-          <button class="ab-btn" id="btn-flip-h" title="左右镜像（水平翻转）">↔️ 镜像</button>
+          <button class="ab-btn" id="btn-flip-h" data-tip="左右镜像（水平翻转）">↔️</button>
         </div>
         <div class="sep"></div>
         <div class="grp">
-          <button class="ab-btn" id="btn-clear">🗑 清空</button>
+          <button class="ab-btn" id="btn-clear" data-tip="清空画布">🗑</button>
         </div>
-        <button class="ab-btn mobile-only" id="btn-show-panel" style="margin-left:auto">🎨 调色板</button>
+        <button class="ab-btn mobile-only" id="btn-show-panel" data-tip="调色板" style="margin-left:auto">🎨</button>
         <div class="ab-meta">
           <span>尺寸 <span class="v" id="m-size">29×29</span></span>
           <span>色板 <span class="v" id="m-brand">MARD</span></span>
@@ -2340,11 +2376,23 @@ function zoom(factor) {
   state.zoom = Math.max(0.1, Math.min(8, state.zoom * factor));
   applyTransform();
 }
+/* Emoji-SVG cursors that follow the active tool. Encoded as data URIs so we
+   don't ship asset files; hotspot picked to feel natural for each gesture. */
+function buildEmojiCursor(emoji, hotX, hotY) {
+  // 32x32 SVG with the emoji centered. Foreground is rendered as system emoji
+  // (the user's OS font), so this stays consistent with toolbar icons.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><text x="16" y="24" font-size="22" text-anchor="middle" font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif">${emoji}</text></svg>`;
+  return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${hotX} ${hotY}, auto`;
+}
+const TOOL_CURSORS = {
+  brush:  buildEmojiCursor('✏️', 4, 28),   // tip = bottom-left
+  eraser: buildEmojiCursor('🧽', 8, 24),
+  fill:   buildEmojiCursor('🪣', 6, 26),
+  picker: buildEmojiCursor('💧', 6, 26),
+  pan:    'grab',
+};
 function updateCursor() {
-  if (state.tool === 'pan') canvas.style.cursor = 'grab';
-  else if (state.tool === 'picker') canvas.style.cursor = 'copy';
-  else if (state.tool === 'fill') canvas.style.cursor = 'pointer';
-  else canvas.style.cursor = 'crosshair';
+  canvas.style.cursor = TOOL_CURSORS[state.tool] || 'crosshair';
 }
 
 /* ============== Pointer Interaction ============== */
