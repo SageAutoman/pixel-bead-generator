@@ -268,8 +268,25 @@
     overflow-x: auto;
     flex-shrink: 0;
   }
-  .action-bar .grp { display: flex; gap: 4px; }
+  .action-bar .grp { display: flex; gap: 4px; align-items: center; }
   .action-bar .sep { width: 1px; height: 20px; background: var(--c-border); }
+  .brush-size-label {
+    font-size: 11px;
+    color: var(--c-text-2);
+    margin-right: 2px;
+    user-select: none;
+  }
+  .brush-size-btn {
+    font-size: 12px !important;
+    font-weight: 600;
+    width: 28px !important;
+    min-width: 28px;
+  }
+  .brush-size-btn.active {
+    background: var(--c-active-bg);
+    color: var(--c-primary);
+    border-color: var(--c-primary);
+  }
   .ab-btn {
     width: 36px;
     height: 36px;
@@ -1146,6 +1163,13 @@
           <button class="ab-btn" id="btn-redo" data-tip="重做 (Ctrl+Shift+Z)" disabled>↪︎</button>
         </div>
         <div class="sep"></div>
+        <div class="grp brush-size-grp" id="brush-size-grp" hidden>
+          <span class="brush-size-label">笔刷</span>
+          <button class="ab-btn brush-size-btn active" data-brush-size="1" data-tip="1×1 (单格) ([)">1</button>
+          <button class="ab-btn brush-size-btn" data-brush-size="2" data-tip="2×2 ([)">2</button>
+          <button class="ab-btn brush-size-btn" data-brush-size="3" data-tip="3×3 (])">3</button>
+        </div>
+        <div class="sep"></div>
         <div class="grp">
           <button class="ab-btn" id="btn-flip-h" data-tip="左右镜像（水平翻转）">↔️</button>
         </div>
@@ -1413,6 +1437,7 @@ const state = {
   beadStyle: 'solid',    // 'solid' | 'hollow' | 'fineGlitter' | 'coarseGlitter' | 'fluffy'
   selectedColorId: 'MARD-E5',  // start with a pink
   tool: 'brush',
+  brushSize: 1,          // 1 | 2 | 3 — applies to brush + eraser
   zoom: 1,
   pan: { x: 0, y: 0 },
   history: [],
@@ -2689,11 +2714,23 @@ function pointerToCell(e) {
   return [x, y];
 }
 
-function paintCell(x, y) {
+function paintCell(cx, cy) {
   const id = state.tool === 'eraser' ? null : state.selectedColorId;
-  if (state.grid[y][x] === id) return false;
-  state.grid[y][x] = id;
-  return true;
+  const n = (state.tool === 'brush' || state.tool === 'eraser') ? state.brushSize : 1;
+  // Brush block: NxN top-left aligned at cursor cell. For n=1 this is a single cell.
+  // Anchor at top-left so the painted block starts at the cursor. (Centered would
+  // feel weird at edges; top-left matches what most pixel editors do.)
+  let any = false;
+  for (let dy = 0; dy < n; dy++) {
+    for (let dx = 0; dx < n; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= state.size || y >= state.size) continue;
+      if (state.grid[y][x] === id) continue;
+      state.grid[y][x] = id;
+      any = true;
+    }
+  }
+  return any;
 }
 
 function fillBucket(x, y) {
@@ -2727,9 +2764,7 @@ wrap.addEventListener('pointerdown', (e) => {
   if (state.tool === 'picker') {
     const id = state.grid[y][x];
     if (id) { state.selectedColorId = id; renderPalette(); }
-    state.tool = 'brush';
-    document.querySelectorAll('.tool[data-tool]').forEach(t => t.classList.toggle('active', t.dataset.tool === 'brush'));
-    updateCursor();
+    setTool('brush');
     return;
   }
   if (state.tool === 'fill') {
@@ -2822,11 +2857,29 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === '1') { e.preventDefault(); setZoom(1); }
   else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoom(1.25); }
   else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoom(0.8); }
+  else if (e.key === '[') { e.preventDefault(); setBrushSize(Math.max(1, state.brushSize - 1)); }
+  else if (e.key === ']') { e.preventDefault(); setBrushSize(Math.min(3, state.brushSize + 1)); }
+});
+function setBrushSize(n) {
+  state.brushSize = Math.max(1, Math.min(3, n | 0));
+  document.querySelectorAll('.brush-size-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.brushSize, 10) === state.brushSize);
+  });
+}
+function refreshBrushSizeGroup() {
+  const grp = document.getElementById('brush-size-grp');
+  if (!grp) return;
+  const show = state.tool === 'brush' || state.tool === 'eraser';
+  grp.hidden = !show;
+}
+document.querySelectorAll('.brush-size-btn').forEach(b => {
+  b.addEventListener('click', () => setBrushSize(parseInt(b.dataset.brushSize, 10)));
 });
 function setTool(t) {
   state.tool = t;
   document.querySelectorAll('.tool[data-tool]').forEach(x => x.classList.toggle('active', x.dataset.tool === t));
   updateCursor();
+  refreshBrushSizeGroup();
 }
 
 /* ============== Palette ============== */
@@ -3089,6 +3142,7 @@ function pinchDistance() {
 initGrid(29);
 renderPalette();
 updateCursor();
+refreshBrushSizeGroup();
 
 // Draft restore banner.
 (function setupDraftBanner() {
