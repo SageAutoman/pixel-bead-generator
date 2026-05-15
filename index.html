@@ -1031,6 +1031,10 @@
         </div>
         <div class="sep"></div>
         <div class="grp">
+          <button class="ab-btn" id="btn-flip-h" title="左右镜像（水平翻转）">↔️ 镜像</button>
+        </div>
+        <div class="sep"></div>
+        <div class="grp">
           <button class="ab-btn" id="btn-clear">🗑 清空</button>
         </div>
         <button class="ab-btn mobile-only" id="btn-show-panel" style="margin-left:auto">🎨 调色板</button>
@@ -2044,6 +2048,14 @@ document.getElementById('btn-new').addEventListener('click', () => {
 });
 document.getElementById('btn-clear').addEventListener('click', () => {
   if (confirm('清空当前画布？')) { state.grid = makeGrid(state.size); pushHistory(); renderCanvas(); renderMaterials(); }
+});
+document.getElementById('btn-flip-h').addEventListener('click', () => {
+  if (!state.grid) return;
+  // Horizontal flip: reverse each row in place. Pure permutation, color counts unchanged.
+  for (let y = 0; y < state.size; y++) state.grid[y].reverse();
+  pushHistory();
+  renderCanvas();
+  showToast('已水平镜像 ↔️');
 });
 
 /* ============== Canvas Rendering ============== */
