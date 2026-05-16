@@ -642,8 +642,46 @@
   .cropper-view-box, .cropper-face { border-radius: 4px; }
   .cropper-line, .cropper-point { background-color: var(--c-primary); }
   .cropper-dashed { border-color: rgba(255, 143, 171, 0.55); }
+  /* Make sure header / actions never collapse so middle (cropper) is the only thing that flexes. */
+  .crop-modal-card { max-height: 100dvh; }
+  .crop-modal-header, .crop-modal-actions { flex-shrink: 0; }
+  .crop-modal-body { flex: 1 1 auto; min-height: 0; }
   @media (max-width: 600px) {
-    .crop-modal-card { width: 100vw; height: 100vh; border-radius: 0; }
+    /* Mobile: full-bleed card with dynamic viewport so iOS/Android nav bars
+       don't push the bottom buttons off-screen. */
+    .crop-modal { padding: 0; align-items: stretch; justify-content: stretch; }
+    .crop-modal-card {
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh; /* progressive enhancement; falls back to 100vh */
+      max-height: 100dvh;
+      border-radius: 0;
+    }
+    .crop-modal-header { padding: 10px 14px; }
+    .crop-modal-header h3 { font-size: 15px; }
+    .crop-modal-header .crop-sub { font-size: 11px; }
+    /* Stack the buttons vertically + full-width — no risk of them
+       getting clipped off the screen edge. */
+    .crop-modal-actions {
+      padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+      flex-direction: column-reverse;
+      align-items: stretch;
+      gap: 6px;
+    }
+    .crop-modal-actions button {
+      width: 100%;
+      padding: 11px 14px;
+      font-size: 14px;
+    }
+  }
+  /* Very short viewport (landscape phone): shrink header + actions further. */
+  @media (max-height: 500px) {
+    .crop-modal-card { height: 100vh; height: 100dvh; max-height: 100dvh; }
+    .crop-modal-header { padding: 6px 12px; }
+    .crop-modal-header h3 { font-size: 13px; }
+    .crop-modal-header .crop-sub { display: none; }
+    .crop-modal-actions { padding: 6px 10px; flex-direction: row; gap: 6px; }
+    .crop-modal-actions button { padding: 7px 10px; font-size: 12px; }
   }
 
   /* Outline popover (designer spec) */
