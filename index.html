@@ -1209,6 +1209,55 @@
     font-size: 11px;
     color: var(--c-text-3);
   }
+  /* Max-colors segmented selector */
+  .color-cap-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0 16px;
+    padding: 10px 12px;
+    background: rgba(255, 143, 171, 0.06);
+    border: 1px solid rgba(255, 143, 171, 0.2);
+    border-radius: var(--r-md);
+  }
+  .color-cap-row .ccr-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--c-text);
+  }
+  .color-cap-row .ccr-segments {
+    display: inline-flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .color-cap-row .ccr-seg {
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--c-border);
+    background: var(--c-paper);
+    color: var(--c-text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .color-cap-row .ccr-seg:hover { background: var(--c-toolbar-bg); }
+  .color-cap-row .ccr-seg.active {
+    background: var(--c-primary);
+    border-color: var(--c-primary);
+    color: white;
+    font-weight: 600;
+  }
+  .color-cap-row .ccr-hint {
+    font-size: 11px;
+    color: var(--c-text-3);
+    flex: 1;
+    min-width: 100%;
+  }
+  @media (min-width: 600px) {
+    .color-cap-row .ccr-hint { flex: 0 1 auto; min-width: 0; }
+  }
   .compare-card {
     border: 2px solid var(--c-border);
     border-radius: 16px;
@@ -1747,6 +1796,18 @@
           </label>
           <span class="bg-toggle-hint">主体清晰的照片效果最好；如有残留可关闭</span>
         </div>
+        <!-- Max-colors selector: clamps the K-means clusters to keep cartoons clean. -->
+        <div class="color-cap-row" id="color-cap-row">
+          <span class="ccr-label">🎨 最大颜色数</span>
+          <div class="ccr-segments" role="group" aria-label="最大颜色数">
+            <button class="ccr-seg" data-cap="8">简洁 8</button>
+            <button class="ccr-seg" data-cap="12">卡通 12</button>
+            <button class="ccr-seg active" data-cap="16">默认 16</button>
+            <button class="ccr-seg" data-cap="24">细致 24</button>
+            <button class="ccr-seg" data-cap="32">丰富 32</button>
+          </div>
+          <span class="ccr-hint">卡通图选 8–16；写实照片选 24–32（变更后立即重生成）</span>
+        </div>
         <div class="compare-grid">
           <div class="compare-card" data-mode="cute">
             <canvas class="compare-canvas" id="canvas-cute"></canvas>
@@ -2036,16 +2097,17 @@ async function changeEditorSize(newSize) {
       const img = state.sourceImage;
       const bgRemove = !!state.sourceBgRemove && !state.sourceAiRemove;
       const mode = state.sourceMode || 'realistic';
+      const cap = state.sourceMaxColors || pendingMaxColors;
       let grid;
       try {
         grid = mode === 'cute'
-          ? generateCute(img, newSize, bgRemove)
-          : generateRealistic(img, newSize, bgRemove);
+          ? generateCute(img, newSize, bgRemove, Math.min(cap, 16))
+          : generateRealistic(img, newSize, bgRemove, cap);
       } catch (err) {
         console.warn('resize re-pixelize failed, retrying without bg removal', err);
         grid = mode === 'cute'
-          ? generateCute(img, newSize, false)
-          : generateRealistic(img, newSize, false);
+          ? generateCute(img, newSize, false, Math.min(cap, 16))
+          : generateRealistic(img, newSize, false, cap);
         showToast('重新像素化遇到背景处理问题，已保留原背景继续生成', 'warn');
       }
       state.size = newSize;
@@ -2548,6 +2610,195 @@ function reducePaletteToTopN(grid, size, n) {
   return out;
 }
 
+/* ============== Lab K-means quantization ==============
+   Cluster the RGB representatives of the size×size grid into k Lab centroids,
+   then snap each centroid to its nearest MARD bead color. Result: every cell
+   is mapped to one of *at most* k bead ids, fixing the "94 different colors
+   on a cartoon image" issue caused by per-cell nearest-color mapping.
+
+   - Lab space (perceptually uniform) → cleaner clusters than raw RGB
+   - K-means++ init → stable centroids, no random degeneration
+   - At most maxIter sweeps; stops early on convergence
+   - After clustering, each centroid maps to the closest MARD color; multiple
+     centroids may collide on the same bead (fine — total distinct beads ≤ k).
+*/
+function kmeansLab(labs, k, maxIter = 18) {
+  const N = labs.length;
+  if (N === 0) return { centroids: [], assignments: [] };
+  k = Math.min(k, N);
+
+  // K-means++ seeding: start from a random point, then weighted sampling by D²
+  const centroids = [labs[(Math.random() * N) | 0].slice()];
+  const minDist = new Float64Array(N).fill(Infinity);
+  for (let c = 1; c < k; c++) {
+    const last = centroids[centroids.length - 1];
+    let total = 0;
+    for (let i = 0; i < N; i++) {
+      const p = labs[i];
+      const dL = p[0] - last[0], da = p[1] - last[1], db = p[2] - last[2];
+      const d = dL * dL + da * da + db * db;
+      if (d < minDist[i]) minDist[i] = d;
+      total += minDist[i];
+    }
+    if (total <= 0) break;
+    let r = Math.random() * total;
+    let pick = N - 1;
+    for (let i = 0; i < N; i++) {
+      r -= minDist[i];
+      if (r <= 0) { pick = i; break; }
+    }
+    centroids.push(labs[pick].slice());
+  }
+
+  const assignments = new Int32Array(N);
+  const sumL = new Float64Array(centroids.length);
+  const sumA = new Float64Array(centroids.length);
+  const sumB = new Float64Array(centroids.length);
+  const cnt = new Int32Array(centroids.length);
+  for (let iter = 0; iter < maxIter; iter++) {
+    let changed = false;
+    // Assignment step
+    for (let i = 0; i < N; i++) {
+      const p = labs[i];
+      let bd = Infinity, bj = 0;
+      for (let j = 0; j < centroids.length; j++) {
+        const c = centroids[j];
+        const dL = p[0] - c[0], da = p[1] - c[1], db = p[2] - c[2];
+        const d = dL * dL + da * da + db * db;
+        if (d < bd) { bd = d; bj = j; }
+      }
+      if (assignments[i] !== bj) { changed = true; assignments[i] = bj; }
+    }
+    if (!changed && iter > 0) break;
+    // Update step
+    sumL.fill(0); sumA.fill(0); sumB.fill(0); cnt.fill(0);
+    for (let i = 0; i < N; i++) {
+      const a = assignments[i], p = labs[i];
+      sumL[a] += p[0]; sumA[a] += p[1]; sumB[a] += p[2]; cnt[a]++;
+    }
+    for (let j = 0; j < centroids.length; j++) {
+      if (cnt[j] > 0) {
+        centroids[j] = [sumL[j] / cnt[j], sumA[j] / cnt[j], sumB[j] / cnt[j]];
+      }
+    }
+  }
+  return { centroids, assignments };
+}
+
+/* Edge-aware downsample variant that returns raw RGB per cell instead of
+   directly snapping to a MARD id. Lets us run K-means on the continuous
+   color space before quantizing. */
+function edgeAwareDownsampleRGB(data, mag, w, scale, gridSize, threshold) {
+  const cells = []; // [gridSize][gridSize] of [r,g,b] | null
+  for (let i = 0; i < gridSize; i++) cells.push(new Array(gridSize).fill(null));
+  const total = scale * scale;
+  for (let gy = 0; gy < gridSize; gy++) {
+    for (let gx = 0; gx < gridSize; gx++) {
+      let edgeR = 0, edgeG = 0, edgeB = 0, edgeW = 0, edgeCount = 0;
+      let avgR = 0, avgG = 0, avgB = 0, avgN = 0, alphaSum = 0;
+      for (let py = gy * scale; py < (gy + 1) * scale; py++) {
+        for (let px = gx * scale; px < (gx + 1) * scale; px++) {
+          const idx = (py * w + px) * 4;
+          const a = data[idx + 3];
+          alphaSum += a;
+          if (a < 64) continue;
+          avgR += data[idx]; avgG += data[idx + 1]; avgB += data[idx + 2]; avgN++;
+          const m = mag[py * w + px] || 0;
+          if (m > threshold) {
+            edgeCount++;
+            edgeR += data[idx] * m; edgeG += data[idx + 1] * m;
+            edgeB += data[idx + 2] * m; edgeW += m;
+          }
+        }
+      }
+      if (alphaSum / total < 64) continue;
+      let r, g, b;
+      if (edgeCount >= total * 0.25 && edgeW > 0) {
+        r = edgeR / edgeW; g = edgeG / edgeW; b = edgeB / edgeW;
+      } else if (avgN > 0) {
+        r = avgR / avgN; g = avgG / avgN; b = avgB / avgN;
+      } else continue;
+      cells[gy][gx] = [r, g, b];
+    }
+  }
+  return cells;
+}
+
+/* Quantize an RGB cell grid to at most k distinct MARD bead colors using
+   Lab K-means clustering. Centroids are snapped to the nearest bead; if
+   several centroids collide on the same bead, the effective color count is
+   smaller (which is fine for cartoons). */
+function quantizeBeadsKmeans(rgbCells, size, k) {
+  // Collect non-null cells for clustering.
+  const points = [];     // [{gx, gy}, ...]
+  const labs = [];       // [[L,a,b], ...]
+  for (let gy = 0; gy < size; gy++) {
+    for (let gx = 0; gx < size; gx++) {
+      const c = rgbCells[gy][gx];
+      if (!c) continue;
+      points.push({ gx, gy });
+      labs.push(rgbToLab(c[0], c[1], c[2]));
+    }
+  }
+  const grid = makeGrid(size);
+  if (points.length === 0) return grid;
+  const effectiveK = Math.max(2, Math.min(k, points.length));
+  const { centroids, assignments } = kmeansLab(labs, effectiveK);
+  // Snap each centroid to the nearest MARD bead.
+  const centroidIds = centroids.map(lab => {
+    let best = PALETTE[0], bd = Infinity;
+    for (const col of PALETTE) {
+      const dL = lab[0] - col.lab[0], da = lab[1] - col.lab[1], db = lab[2] - col.lab[2];
+      const d = dL * dL + da * da + db * db;
+      if (d < bd) { bd = d; best = col; }
+    }
+    return best.id;
+  });
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    grid[p.gy][p.gx] = centroidIds[assignments[i]];
+  }
+  return grid;
+}
+
+/* Reduce an already-id-grid to ≤k distinct beads via Lab K-means. Use this
+   instead of frequency-based reducePaletteToTopN when you want clusters
+   formed by perceptual color groups, not popularity. Cheap because we only
+   cluster the unique ids (typically dozens after the K-means pre-pass). */
+function kmeansReduceIds(grid, size, k) {
+  const counts = new Map();
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const id = grid[y][x];
+      if (!id) continue;
+      counts.set(id, (counts.get(id) || 0) + 1);
+    }
+  }
+  if (counts.size <= k) return grid;
+  const ids = [...counts.keys()];
+  const labs = ids.map(id => PALETTE_BY_ID[id].lab);
+  const { centroids, assignments } = kmeansLab(labs, k);
+  const centroidIds = centroids.map(lab => {
+    let best = PALETTE[0], bd = Infinity;
+    for (const col of PALETTE) {
+      const dL = lab[0] - col.lab[0], da = lab[1] - col.lab[1], db = lab[2] - col.lab[2];
+      const d = dL * dL + da * da + db * db;
+      if (d < bd) { bd = d; best = col; }
+    }
+    return best.id;
+  });
+  const idToFinal = {};
+  for (let i = 0; i < ids.length; i++) idToFinal[ids[i]] = centroidIds[assignments[i]];
+  const out = makeGrid(size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const id = grid[y][x];
+      if (id) out[y][x] = idToFinal[id];
+    }
+  }
+  return out;
+}
+
 /* ============== ML Background Removal (@imgly) ============== */
 let imglyLib = null;
 let imglyLoading = null;
@@ -2711,24 +2962,31 @@ function removeBackgroundHeuristic(srcData, w, h) {
   return out;
 }
 
-function generateRealistic(img, size, bgRemove) {
-  // High-res 4x render → optional bg mask → strong USM (preserve eyes/mouth) → Sobel → edge-aware sample
+function generateRealistic(img, size, bgRemove, maxColors) {
+  // High-res 4x render → optional bg mask → strong USM (preserve eyes/mouth) → Sobel
+  // → edge-aware sample (raw RGB) → Lab K-means quantize to ≤ maxColors.
   const { orig, blurred, w } = generateHiresPair(img, size, 4, 1.5);
   const masked = bgRemove ? (removeBackgroundHeuristic(orig, w, w) || orig) : orig;
   const sharp = applyUSM(masked, blurred, 0.9);
   const mag = computeSobelMag(sharp, w, w);
-  return edgeAwareDownsample(sharp, mag, w, 4, size, 70);
+  const rgbCells = edgeAwareDownsampleRGB(sharp, mag, w, 4, size, 70);
+  // Realistic keeps more detail but still caps colors so we don't get the
+  // "every pixel maps to a slightly different bead" failure mode.
+  const k = Math.max(8, Math.min(48, maxColors || 24));
+  return quantizeBeadsKmeans(rgbCells, size, k);
 }
 
-function generateCute(img, size, bgRemove) {
-  // Lighter sharpen + edge-aware sample → reduce to ~10 colors for cartoon block look
+function generateCute(img, size, bgRemove, maxColors) {
+  // Lighter sharpen + edge-aware sample → Lab K-means with fewer clusters
+  // for the cartoon big-block look (matches competitor 15-color reference).
   const { orig, blurred, w } = generateHiresPair(img, size, 4, 1.5);
   const masked = bgRemove ? (removeBackgroundHeuristic(orig, w, w) || orig) : orig;
   const sharp = applyUSM(masked, blurred, 0.4);
   const mag = computeSobelMag(sharp, w, w);
-  const raw = edgeAwareDownsample(sharp, mag, w, 4, size, 70);
-  const target = Math.min(12, Math.max(6, Math.round(size * size / 80)));
-  return reducePaletteToTopN(raw, size, target);
+  const rgbCells = edgeAwareDownsampleRGB(sharp, mag, w, 4, size, 70);
+  // Cute defaults aggressive: 12 colors fits most cartoons (anime, line art).
+  const k = Math.max(6, Math.min(24, maxColors || 12));
+  return quantizeBeadsKmeans(rgbCells, size, k);
 }
 
 function estimateComplexity(img) {
@@ -2779,6 +3037,7 @@ let pendingImg = null;
 let pendingSize = 29;
 let pendingResults = null;
 let pendingAiRemove = true;
+let pendingMaxColors = 16;  // default cap; user-selectable in compare modal
 let preSuggestSnapshot = null;
 let currentSuggestedSize = null;
 let pipelineStage = 'image:loading';
@@ -3041,22 +3300,22 @@ async function runComparison(runId = compareRunId) {
   const heuristicBg = bgRemove && !bgAlreadyRemoved;
   let realistic, cute;
   try {
-    realistic = generateRealistic(workImg, pendingSize, heuristicBg);
+    realistic = generateRealistic(workImg, pendingSize, heuristicBg, pendingMaxColors);
     await new Promise(r => requestAnimationFrame(r));
     if (!isCompareRunActive(runId)) return;
     // Q 版从已生成的写实网格做调色板简化，避免在 AI off / 放大重算路径重复跑一遍重图像管线导致卡住。
-    const cuteTarget = Math.min(12, Math.max(6, Math.round(pendingSize * pendingSize / 80)));
-    cute = reducePaletteToTopN(realistic, pendingSize, cuteTarget);
+    const cuteTarget = Math.max(6, Math.min(pendingMaxColors, 16) * 0.75 | 0);
+    cute = kmeansReduceIds(realistic, pendingSize, cuteTarget);
   } catch (err) {
     console.warn('pixel generation failed, retrying without bg removal', err);
     showToast('生成时背景处理卡住，已保留原背景重试', 'warn');
     try {
       await new Promise(r => requestAnimationFrame(r));
-      realistic = generateRealistic(workImg, pendingSize, false);
+      realistic = generateRealistic(workImg, pendingSize, false, pendingMaxColors);
       await new Promise(r => requestAnimationFrame(r));
       if (!isCompareRunActive(runId)) return;
-      const cuteTarget = Math.min(12, Math.max(6, Math.round(pendingSize * pendingSize / 80)));
-      cute = reducePaletteToTopN(realistic, pendingSize, cuteTarget);
+      const cuteTarget = Math.max(6, Math.min(pendingMaxColors, 16) * 0.75 | 0);
+      cute = kmeansReduceIds(realistic, pendingSize, cuteTarget);
     } catch (retryErr) {
       console.error('pixel generation retry failed', retryErr);
       showToast('切换失败，请重试', 'error');
@@ -3115,11 +3374,11 @@ async function runPixelOnlyResize(size, runId = compareRunId) {
   if (!isCompareRunActive(runId)) return;
   let realistic, cute;
   try {
-    realistic = generateRealistic(pendingImg, size, false);
+    realistic = generateRealistic(pendingImg, size, false, pendingMaxColors);
     await new Promise(r => requestAnimationFrame(r));
     if (!isCompareRunActive(runId)) return;
-    const cuteTarget = Math.min(12, Math.max(6, Math.round(size * size / 80)));
-    cute = reducePaletteToTopN(realistic, size, cuteTarget);
+    const cuteTarget = Math.max(6, Math.min(pendingMaxColors, 16) * 0.75 | 0);
+    cute = kmeansReduceIds(realistic, size, cuteTarget);
   } catch (err) {
     console.error('AI-off resize failed', err);
     showToast('切换失败，请重试', 'error');
@@ -3192,6 +3451,7 @@ function pickStyle(mode) {
   state.sourceImage = pendingAiRemove ? null : pendingImg;
   state.sourceMode = mode;
   state.sourceBgRemove = pendingAiRemove ? (document.getElementById('bg-remove-toggle')?.checked ?? true) : false;
+  state.sourceMaxColors = pendingMaxColors;
   state.sourceAiRemove = pendingAiRemove;
   syncEditorSizeUI();
   refreshActionBar();
@@ -3233,6 +3493,27 @@ document.getElementById('bg-ml-toggle').addEventListener('change', () => {
   document.getElementById('compare-content').hidden = true;
   requestAnimationFrame(() => requestAnimationFrame(() => runComparison(compareRunId)));
 });
+
+/* Max-colors segmented selector — clamps K-means clusters so cartoons don't
+   end up with 90+ MARD ids. Default 16 mid-range, user can drop to 8 for
+   very flat art or push to 32 for photo realism. */
+(function setupColorCap() {
+  const row = document.getElementById('color-cap-row');
+  if (!row) return;
+  const segs = row.querySelectorAll('.ccr-seg');
+  segs.forEach(seg => {
+    seg.addEventListener('click', () => {
+      const cap = parseInt(seg.dataset.cap, 10);
+      if (!cap || cap === pendingMaxColors) return;
+      pendingMaxColors = cap;
+      segs.forEach(s => s.classList.toggle('active', s === seg));
+      if (!pendingImg) return;
+      document.getElementById('compare-loading').hidden = false;
+      document.getElementById('compare-content').hidden = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => runComparison(compareRunId)));
+    });
+  });
+})();
 
 /* ============== Tooltip (portal) ============== */
 (function setupTooltip() {
