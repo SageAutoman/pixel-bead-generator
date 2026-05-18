@@ -869,9 +869,14 @@
   .palette-scroll {
     flex: 1;
     overflow-y: auto;
-    padding: 0 14shrink: 0;
+    padding: 0 14px;
+  }
+  .materials {
+    flex-shrink: 0;
     max-height: 30vh;
     overflow-y: auto;
+    padding: 14px;
+    border-top: 1px solid var(--c-border);
   }
   .material-item {
     display: flex;
@@ -2491,6 +2496,58 @@ function gridFromImageData(data, size) {
 }
 
 /* High-res render + parallel blurred render for USM */
+/* Flood-fill the corners of an image, marking near-white low-chroma pixels
+   as alpha=0. Used when the user wants background removed but didn't run ML.
+   Returns an HTMLCanvasElement (drop-in for HTMLImageElement in drawImage). */
+function floodFillWhiteEdgesToAlpha(img) {
+  const W = img.naturalWidth || img.width;
+  const H = img.naturalHeight || img.height;
+  if (!W || !H) return img;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const cx = c.getContext('2d');
+  cx.drawImage(img, 0, 0);
+  const imgData = cx.getImageData(0, 0, W, H);
+  const px = imgData.data;
+  const visited = new Uint8Array(W * H);
+  const stack = [];
+  // Seed every border pixel that's "near white + low chroma".
+  const isNearWhite = (i) => {
+    const r = px[i], g = px[i + 1], b = px[i + 2], a = px[i + 3];
+    if (a < 200) return true; // already transparent — include in fill
+    if (r < 220 || g < 220 || b < 220) return false;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    return (max - min) <= 25;
+  };
+  for (let x = 0; x < W; x++) {
+    for (const y of [0, H - 1]) {
+      const idx = y * W + x;
+      if (!visited[idx] && isNearWhite(idx * 4)) stack.push(idx);
+    }
+  }
+  for (let y = 0; y < H; y++) {
+    for (const x of [0, W - 1]) {
+      const idx = y * W + x;
+      if (!visited[idx] && isNearWhite(idx * 4)) stack.push(idx);
+    }
+  }
+  while (stack.length) {
+    const idx = stack.pop();
+    if (visited[idx]) continue;
+    visited[idx] = 1;
+    const o = idx * 4;
+    if (!isNearWhite(o)) continue;
+    px[o + 3] = 0; // punch alpha
+    const x = idx % W, y = (idx / W) | 0;
+    if (x > 0) stack.push(idx - 1);
+    if (x < W - 1) stack.push(idx + 1);
+    if (y > 0) stack.push(idx - W);
+    if (y < H - 1) stack.push(idx + W);
+  }
+  cx.putImageData(imgData, 0, 0);
+  return c;
+}
+
 function generateHiresPair(img, size, scale = 4, blurPx = 1.5) {
   const w = size * scale;
   const s = Math.min(img.width, img.height);
@@ -2865,21 +2922,21 @@ async function mlRemoveBackground(srcImg, onProgress) {
     im.onerror = reject;
     im.src = url;
   });
-  // Composite onto a white background so the bead-quantization sees solid colors
-  // for non-foreground regions, but with low chroma so they still get culled later
-  // by the heuristic mask if needed. We keep a separate alpha-aware version for
-  // cropping; here we punch transparent → pure white.
-  const flat = document.createElement('canvas');
-  flat.width = out.naturalWidth;
-  flat.height = out.naturalHeight;
-  const fc = flat.getContext('2d');
-  fc.fillStyle = '#ffffff';
-  fc.fillRect(0, 0, flat.width, flat.height);
-  fc.drawImage(out, 0, 0);
-  // Return both the flat-on-white image (for the existing pipeline) and a hint
-  // that bg has been removed so callers can skip heuristic.
-  const flatImg = await new Promise((resolve, reject) => {
-    flat.toBlob((b) => {
+  // The edge-aware downsample is alpha-aware (skips cells with avg alpha < 64),
+  // so we KEEP transparency in the ML output. Previously we punched alpha → white,
+  // which made the K-means clusters include a "near-white" centroid and every
+  // background cell got mapped to H2 (white bead). That's wrong — sage's bug:
+  // "导入图片外围的白色不要匹配到 H2 的白色豆子". Solution: preserve alpha so
+  // those cells stay null (no bead).
+  const transparentImg = await new Promise((resolve, reject) => {
+    // Render the alpha PNG into a canvas, then re-export to a fresh blob URL
+    // (some image decoders demote PNG alpha when reused via the same blob).
+    const c = document.createElement('canvas');
+    c.width = out.naturalWidth;
+    c.height = out.naturalHeight;
+    const cx = c.getContext('2d');
+    cx.drawImage(out, 0, 0);
+    c.toBlob((b) => {
       if (!b) return reject(new Error('toBlob failed'));
       const u = URL.createObjectURL(b);
       const im2 = new Image();
@@ -2888,7 +2945,7 @@ async function mlRemoveBackground(srcImg, onProgress) {
       im2.src = u;
     }, 'image/png');
   });
-  return flatImg;
+  return transparentImg;
 }
 
 function removeBackgroundHeuristic(srcData, w, h) {
@@ -3298,6 +3355,18 @@ async function runComparison(runId = compareRunId) {
   if (!isCompareRunActive(runId)) return;
 
   const heuristicBg = bgRemove && !bgAlreadyRemoved;
+  // When the user wants background removed but didn't run ML, do a cheap
+  // flood-fill from the corners that punches near-white pixels to alpha=0.
+  // Without this the bead pipeline maps that white margin to MARD H2 and
+  // every photo with a white border gets a frame of white beads. (sage:
+  // "导入图片外围的白色不要匹配到 H2 的白色豆子".)
+  if (heuristicBg && workImg === pendingImg) {
+    try {
+      workImg = floodFillWhiteEdgesToAlpha(workImg);
+    } catch (err) {
+      console.warn('white-edge alpha cut failed, continuing with original', err);
+    }
+  }
   let realistic, cute;
   try {
     realistic = generateRealistic(workImg, pendingSize, heuristicBg, pendingMaxColors);
@@ -3925,23 +3994,30 @@ function drawBead(ctx, cx, cy, cell, hex, style, seed) {
     return;
   }
 
-  // Ironed styles: fused fills, no gap, no center hole, true square (designer spec)
+  // Ironed styles: fused fills, no gap, no center hole. Now with subtle
+  // rounded corners on each bead — sage feedback "互相之间有一点弧度和 R 角，
+  // 铺满的同时不那么棱角分明". Adjacent same-color beads still appear seamless
+  // because the corners are small relative to the cell, and we overdraw 0.5px
+  // outside the cell to bridge any sub-pixel gaps.
   const half = cell / 2;
-  const cornerR = 0;
+  const cornerR = Math.max(1, cell * 0.18);
   const rand = mulberry32(seed);
 
-  // Base fused square — full fillRect, slight overdraw to fully cover any
-  // underlying grid lines so adjacent cells appear truly seamless.
+  // Base fused rounded square. Slight overdraw ensures adjacent same-color
+  // beads still look continuous (the rounded corners only show at color
+  // boundaries / canvas background — exactly where you want a soft seam).
   ctx.fillStyle = hex;
-  ctx.fillRect(cx - half - 0.5, cy - half - 0.5, cell + 1, cell + 1);
+  roundedRectPath(ctx, cx - half - 0.5, cy - half - 0.5, cell + 1, cell + 1, cornerR);
+  ctx.fill();
 
   if (style === 'fluffy') {
-    // 毛巾烫: matte. Cell is just the base fillRect — no center highlight,
+    // 毛巾烫: matte. Cell is just the base rounded fill — no center highlight,
     // no per-cell noise. The fabric/towel weave is drawn globally after
     // all beads (see drawFluffyOverlay). Slightly desaturate the base by
     // overlaying a faint neutral wash to suggest the matte film.
     ctx.fillStyle = 'rgba(255,255,255,0.04)';
-    ctx.fillRect(cx - half - 0.5, cy - half - 0.5, cell + 1, cell + 1);
+    roundedRectPath(ctx, cx - half - 0.5, cy - half - 0.5, cell + 1, cell + 1, cornerR);
+    ctx.fill();
   } else if (style === 'fineGlitter') {
     // 细闪: dense fine bright specks across fused surface
     for (let i = 0; i < 14; i++) {
