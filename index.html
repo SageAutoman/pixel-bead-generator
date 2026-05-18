@@ -773,6 +773,37 @@
     justify-content: space-between;
     align-items: center;
   }
+  /* sb-section collapsible support — every right-rail section gets the same
+     ▼/▶ caret + click-to-toggle treatment as the materials block. */
+  .sb-title.sb-toggle { cursor: pointer; user-select: none; }
+  .sb-title.sb-toggle:hover { color: var(--c-secondary); }
+  .sb-caret {
+    display: inline-block;
+    font-size: 10px;
+    margin-right: 6px;
+    transition: transform 0.15s ease;
+    color: var(--c-text-3);
+  }
+  .sb-section.collapsed .sb-caret { transform: rotate(-90deg); }
+  .sb-section.collapsed .sb-body { display: none; }
+  .sb-section.collapsed { padding-bottom: 8px; }
+  /* The palette section is a flex container so its scroll grid fills the
+     remaining sidebar height when expanded. */
+  .sb-section.sb-section-flex {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .sb-section.sb-section-flex.collapsed { flex: 0 0 auto; }
+  .sb-body.sb-body-flex {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .sb-body.sb-body-flex .palette-scroll { flex: 1; min-height: 0; }
   .brand-select {
     width: 100%;
     padding: 8px 10px;
@@ -836,6 +867,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, 26px);
     gap: 6px;
+    justify-content: start;
   }
   .used-block .used-dot {
     width: 26px; height: 26px;
@@ -844,6 +876,12 @@
     cursor: pointer;
     position: relative;
     transition: transform 0.1s;
+    /* Force perfect circle even when grid container is narrower than expected
+       (sage feedback: "这里压扁了"). */
+    aspect-ratio: 1 / 1;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    padding: 0;
   }
   .used-block .used-dot:hover { transform: scale(1.15); }
   .used-block .used-dot.active { box-shadow: 0 0 0 2px var(--c-secondary); }
@@ -938,6 +976,9 @@
     background-clip: padding-box;
     position: relative;
     transition: transform 0.1s;
+    aspect-ratio: 1 / 1;
+    flex-shrink: 0;
+    box-sizing: border-box;
   }
   .color-dot:hover { transform: scale(1.15); z-index: 1; }
   .color-dot.active {
@@ -1771,38 +1812,44 @@
         <button class="sidebar-tab active" data-tab="color">🎨 色卡</button>
         <button class="sidebar-tab" data-tab="mat">📦 用料</button>
       </div>
-      <div class="sb-section">
-        <div class="sb-title"><span>📐 画板大小</span><span id="size-source-hint" style="color:var(--c-text-3);font-weight:500;font-size:10px"></span></div>
-        <div class="size-row" id="editor-size-row">
-          <button class="size-btn" data-size="29"><span class="n">29²</span><span class="lbl">~7.5cm</span></button>
-          <button class="size-btn active" data-size="38"><span class="n">38²</span><span class="lbl">~10cm</span></button>
-          <button class="size-btn" data-size="48"><span class="n">48²</span><span class="lbl">~12.5cm</span></button>
-          <button class="size-btn" data-size="58"><span class="n">58²</span><span class="lbl">~15cm</span></button>
+      <div class="sb-section" data-sb-key="size">
+        <div class="sb-title sb-toggle"><span><span class="sb-caret">▼</span>📐 画板大小</span><span id="size-source-hint" style="color:var(--c-text-3);font-weight:500;font-size:10px"></span></div>
+        <div class="sb-body">
+          <div class="size-row" id="editor-size-row">
+            <button class="size-btn" data-size="29"><span class="n">29²</span><span class="lbl">~7.5cm</span></button>
+            <button class="size-btn active" data-size="38"><span class="n">38²</span><span class="lbl">~10cm</span></button>
+            <button class="size-btn" data-size="48"><span class="n">48²</span><span class="lbl">~12.5cm</span></button>
+            <button class="size-btn" data-size="58"><span class="n">58²</span><span class="lbl">~15cm</span></button>
+          </div>
         </div>
       </div>
-      <div class="sb-section">
-        <div class="sb-title"><span>✨ 显示样式</span><span style="color:var(--c-text-3);font-weight:500;font-size:10px">未烫 · 已烫</span></div>
-        <div class="bead-style-row" id="bead-style-row">
-          <button class="bs-btn active" data-style="solid" title="普通圆豆（未熨烫）">🟢<span>普通</span></button>
-          <button class="bs-btn" data-style="hollow" title="空心豆（未熨烫）">⭕<span>空心</span></button>
-          <button class="bs-btn" data-style="fluffy" title="毛巾烫 · 已熨烫融合，哑光">🌫️<span>毛巾烫</span></button>
-          <button class="bs-btn" data-style="fineGlitter" title="细闪 · 已熨烫融合">✨<span>细闪</span></button>
-          <button class="bs-btn" data-style="coarseGlitter" title="粗闪 · 已熨烫融合">💫<span>粗闪</span></button>
+      <div class="sb-section" data-sb-key="style">
+        <div class="sb-title sb-toggle"><span><span class="sb-caret">▼</span>✨ 显示样式</span><span style="color:var(--c-text-3);font-weight:500;font-size:10px">未烫 · 已烫</span></div>
+        <div class="sb-body">
+          <div class="bead-style-row" id="bead-style-row">
+            <button class="bs-btn active" data-style="solid" title="普通圆豆（未熨烫）">🟢<span>普通</span></button>
+            <button class="bs-btn" data-style="hollow" title="空心豆（未熨烫）">⭕<span>空心</span></button>
+            <button class="bs-btn" data-style="fluffy" title="毛巾烫 · 已熨烫融合，哑光">🌫️<span>毛巾烫</span></button>
+            <button class="bs-btn" data-style="fineGlitter" title="细闪 · 已熨烫融合">✨<span>细闪</span></button>
+            <button class="bs-btn" data-style="coarseGlitter" title="粗闪 · 已熨烫融合">💫<span>粗闪</span></button>
+          </div>
         </div>
       </div>
-      <div class="sb-section">
-        <div class="sb-title"><span>🎨 色卡库</span><span id="palette-count" style="color:var(--c-text-3);font-weight:500">0色</span></div>
-        <select class="brand-select" id="brand-select">
-          <option value="MARD">MARD（默认 · 291色 · 国内 2.6mm 迷你豆）</option>
-          <option value="Hama">Hama Midi（即将上线，等官方色卡接入）</option>
-          <option value="Perler">Perler（即将上线，等官方色卡接入）</option>
-        </select>
-        <div class="palette-search">
-          <input type="search" id="palette-search-input" placeholder="搜色号 / 色名 / hex" autocomplete="off" />
-          <button class="palette-search-clear" id="palette-search-clear" type="button" hidden aria-label="清空">✕</button>
+      <div class="sb-section sb-section-flex" data-sb-key="palette">
+        <div class="sb-title sb-toggle"><span><span class="sb-caret">▼</span>🎨 色卡库</span><span id="palette-count" style="color:var(--c-text-3);font-weight:500">0色</span></div>
+        <div class="sb-body sb-body-flex">
+          <select class="brand-select" id="brand-select">
+            <option value="MARD">MARD（默认 · 291色 · 国内 2.6mm 迷你豆）</option>
+            <option value="Hama">Hama Midi（即将上线，等官方色卡接入）</option>
+            <option value="Perler">Perler（即将上线，等官方色卡接入）</option>
+          </select>
+          <div class="palette-search">
+            <input type="search" id="palette-search-input" placeholder="搜色号 / 色名 / hex" autocomplete="off" />
+            <button class="palette-search-clear" id="palette-search-clear" type="button" hidden aria-label="清空">✕</button>
+          </div>
+          <div class="palette-scroll" id="palette"></div>
         </div>
       </div>
-      <div class="palette-scroll" id="palette"></div>
       <div class="materials" id="materials-block">
         <div class="sb-title materials-head" id="materials-head" role="button" tabindex="0" aria-expanded="true">
           <span><span class="materials-caret">▼</span> 📦 用料清单</span>
@@ -3709,6 +3756,38 @@ document.getElementById('bg-ml-toggle').addEventListener('change', () => {
   head.addEventListener('click', toggle);
   head.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+  });
+})();
+
+/* Generic sb-section collapsible: every .sb-section[data-sb-key] in the
+   sidebar gets a click-to-toggle on its .sb-title.sb-toggle, with state
+   persisted per-section in localStorage. The .materials block has its own
+   handler (setupMaterialsToggle) since it predates this generic one. */
+(function setupSbSectionToggles() {
+  const KEY_PREFIX = 'pixelbead.sb.';
+  document.querySelectorAll('.sb-section[data-sb-key]').forEach(section => {
+    const key = section.dataset.sbKey;
+    const head = section.querySelector('.sb-title.sb-toggle');
+    if (!key || !head) return;
+    const KEY = `${KEY_PREFIX}${key}.collapsed.v1`;
+    try {
+      if (localStorage.getItem(KEY) === '1') section.classList.add('collapsed');
+    } catch (_) {}
+    head.setAttribute('role', 'button');
+    head.setAttribute('tabindex', '0');
+    head.setAttribute('aria-expanded', section.classList.contains('collapsed') ? 'false' : 'true');
+    const toggle = (e) => {
+      // Skip if click started on an inner control (e.g. the size-source-hint
+      // or palette-count count element — it's just decorative text but better
+      // safe than sorry).
+      const collapsed = section.classList.toggle('collapsed');
+      head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (_) {}
+    };
+    head.addEventListener('click', toggle);
+    head.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(e); }
+    });
   });
 })();
 
