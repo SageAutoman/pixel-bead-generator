@@ -866,6 +866,93 @@
     color: var(--c-text-3);
     font-size: 12px;
   }
+  /* Family color block — collapsible group of MARD beads. The whole block
+     (head + grid) was wiped by an earlier merge; this is the original styling
+     restored: rounded card, click-to-toggle head, grid of round color dots. */
+  .family-block {
+    margin: 10px 0 0;
+    background: var(--c-paper);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    overflow: hidden;
+  }
+  .family-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--c-text);
+    user-select: none;
+    transition: background 0.12s;
+  }
+  .family-head:hover { background: var(--c-toolbar-bg); }
+  .family-head .l {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .family-head .l .swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--c-border);
+    flex-shrink: 0;
+  }
+  .family-head .fh-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--c-text-3);
+    font-weight: 500;
+  }
+  .family-head .count { font-size: 11px; }
+  .family-head .caret::before {
+    content: '▶';
+    font-size: 9px;
+    display: inline-block;
+    transition: transform 0.15s;
+    color: var(--c-text-3);
+  }
+  .family-block.open .family-head .caret::before { transform: rotate(90deg); }
+  .family-grid {
+    display: none;
+    grid-template-columns: repeat(auto-fill, 26px);
+    gap: 6px;
+    padding: 10px 12px 12px;
+    background: var(--c-toolbar-bg);
+    border-top: 1px solid var(--c-border);
+  }
+  .family-block.open .family-grid { display: grid; }
+  /* The actual round bead button — the "之前是圆的色卡按钮" sage was missing. */
+  .color-dot {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--c-border);
+    cursor: pointer;
+    padding: 0;
+    background-clip: padding-box;
+    position: relative;
+    transition: transform 0.1s;
+  }
+  .color-dot:hover { transform: scale(1.15); z-index: 1; }
+  .color-dot.active {
+    box-shadow: 0 0 0 2px var(--c-secondary);
+    z-index: 1;
+  }
+  .color-dot.special::after {
+    content: '✨';
+    position: absolute;
+    top: -6px;
+    right: -4px;
+    font-size: 9px;
+    line-height: 1;
+    pointer-events: none;
+  }
   .palette-scroll {
     flex: 1;
     overflow-y: auto;
@@ -877,7 +964,24 @@
     overflow-y: auto;
     padding: 14px;
     border-top: 1px solid var(--c-border);
+    transition: max-height 0.2s ease;
   }
+  .materials .materials-head {
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 8px;
+  }
+  .materials .materials-head:hover { color: var(--c-secondary); }
+  .materials .materials-caret {
+    display: inline-block;
+    font-size: 10px;
+    margin-right: 4px;
+    transition: transform 0.15s ease;
+    color: var(--c-text-3);
+  }
+  .materials.collapsed .materials-caret { transform: rotate(-90deg); }
+  .materials.collapsed { max-height: 44px; overflow: hidden; }
+  .materials.collapsed #material-list { display: none; }
   .material-item {
     display: flex;
     align-items: center;
@@ -1699,9 +1803,9 @@
         </div>
       </div>
       <div class="palette-scroll" id="palette"></div>
-      <div class="materials">
-        <div class="sb-title">
-          <span>📦 用料清单</span>
+      <div class="materials" id="materials-block">
+        <div class="sb-title materials-head" id="materials-head" role="button" tabindex="0" aria-expanded="true">
+          <span><span class="materials-caret">▼</span> 📦 用料清单</span>
           <span style="color:var(--c-secondary);font-weight:700" id="total-beads">0 颗</span>
         </div>
         <div id="material-list"></div>
@@ -3584,6 +3688,30 @@ document.getElementById('bg-ml-toggle').addEventListener('change', () => {
   });
 })();
 
+/* Materials collapse toggle. Defaults to open; stores preference in localStorage
+   so users who keep it folded don't have to re-fold every session. */
+(function setupMaterialsToggle() {
+  const block = document.getElementById('materials-block');
+  const head = document.getElementById('materials-head');
+  if (!block || !head) return;
+  const KEY = 'pixelbead.materials.collapsed.v1';
+  try {
+    if (localStorage.getItem(KEY) === '1') {
+      block.classList.add('collapsed');
+      head.setAttribute('aria-expanded', 'false');
+    }
+  } catch (_) {}
+  const toggle = () => {
+    const collapsed = block.classList.toggle('collapsed');
+    head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (_) {}
+  };
+  head.addEventListener('click', toggle);
+  head.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+  });
+})();
+
 /* ============== Tooltip (portal) ============== */
 (function setupTooltip() {
   let tipEl = null;
@@ -4000,7 +4128,7 @@ function drawBead(ctx, cx, cy, cell, hex, style, seed) {
   // because the corners are small relative to the cell, and we overdraw 0.5px
   // outside the cell to bridge any sub-pixel gaps.
   const half = cell / 2;
-  const cornerR = Math.max(1, cell * 0.18);
+  const cornerR = Math.max(1, cell * 0.32);
   const rand = mulberry32(seed);
 
   // Base fused rounded square. Slight overdraw ensures adjacent same-color
