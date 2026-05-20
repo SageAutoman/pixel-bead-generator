@@ -1459,6 +1459,168 @@
     transition: transform 0.1s;
   }
   .compare-pick:active { transform: scale(0.97); }
+  /* ============== Text-stamp modal (artistic word art) ============== */
+  .ts-modal { max-width: 640px; }
+  .ts-row { margin-bottom: 14px; }
+  .ts-row-inline { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+  .ts-col { flex: 1; min-width: 130px; }
+  .ts-lbl {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--c-text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+  #ts-text {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    font: inherit;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 56px;
+    background: var(--c-paper);
+    color: var(--c-text);
+  }
+  #ts-text:focus { outline: 2px solid var(--c-secondary); outline-offset: -1px; }
+  .ts-fonts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+  }
+  .ts-font-card {
+    background: var(--c-paper);
+    border: 2px solid var(--c-border);
+    border-radius: 10px;
+    padding: 10px 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: 0.15s;
+    user-select: none;
+  }
+  .ts-font-card:hover { border-color: var(--c-secondary); background: var(--c-toolbar-bg); }
+  .ts-font-card.active {
+    border-color: var(--c-primary);
+    background: rgba(255, 143, 171, 0.08);
+    box-shadow: 0 0 0 2px rgba(255, 143, 171, 0.2);
+  }
+  .ts-font-card .ts-font-glyph {
+    font-size: 28px;
+    line-height: 1.1;
+    color: var(--c-text);
+    margin-bottom: 2px;
+    min-height: 32px;
+  }
+  .ts-font-card .ts-font-name {
+    font-size: 11px;
+    color: var(--c-text-2);
+    font-weight: 600;
+  }
+  .ts-color-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--c-paper);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--c-text);
+    transition: border-color 0.12s;
+  }
+  .ts-color-trigger:hover { border-color: var(--c-secondary); }
+  .ts-color-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--c-border);
+    flex-shrink: 0;
+    aspect-ratio: 1 / 1;
+  }
+  #ts-stroke-w {
+    width: 100%;
+    accent-color: var(--c-primary);
+  }
+  .ts-preview-wrap {
+    position: relative;
+    background: #fafafa;
+    background-image:
+      linear-gradient(45deg, #eee 25%, transparent 25%),
+      linear-gradient(-45deg, #eee 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #eee 75%),
+      linear-gradient(-45deg, transparent 75%, #eee 75%);
+    background-size: 12px 12px;
+    background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  #ts-preview {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    max-width: 100%;
+    max-height: 240px;
+  }
+  .ts-preview-status {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    color: var(--c-text-3);
+    background: rgba(255, 255, 255, 0.9);
+    padding: 4px 10px;
+    border-radius: 100px;
+    pointer-events: none;
+  }
+  .ts-preview-status:empty { display: none; }
+  .ts-color-pop {
+    position: fixed;
+    background: var(--c-paper);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    padding: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    z-index: 1100;
+    max-width: 280px;
+    max-height: 320px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 24px);
+    gap: 5px;
+    justify-content: start;
+  }
+  .ts-color-pop .ts-color-pop-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid var(--c-border);
+    cursor: pointer;
+    transition: transform 0.1s;
+    aspect-ratio: 1 / 1;
+    padding: 0;
+  }
+  .ts-color-pop .ts-color-pop-dot:hover { transform: scale(1.18); z-index: 1; }
+  .ts-color-pop .ts-color-pop-dot.active { box-shadow: 0 0 0 2px var(--c-secondary); }
+  /* Stamp overlay (rendered as semi-transparent grid floating on canvas) */
+  .stamp-overlay {
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0.72;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    box-shadow: 0 0 0 2px var(--c-primary), 0 0 0 4px rgba(255,143,171,0.3);
+    border-radius: 2px;
+  }
+  .stamping-cursor canvas { cursor: crosshair !important; }
   .compare-loading {
     text-align: center;
     padding: 60px 20px;
@@ -1762,6 +1924,7 @@
         <div class="sep"></div>
         <div class="grp">
           <button class="ab-btn" id="btn-flip-h" data-tip="左右镜像（水平翻转）">↔️</button>
+          <button class="ab-btn" id="btn-textstamp" data-tip="艺术字（中英文印章）">🅰️</button>
         </div>
         <div class="sep"></div>
         <div class="grp">
@@ -1989,6 +2152,56 @@
         <div class="modal-footer">
           <button class="modal-cancel" id="compare-cancel">取消，重新上传</button>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Text-stamp modal (artistic word art) -->
+<div class="modal-backdrop" id="textstamp-modal">
+  <div class="modal ts-modal">
+    <div class="modal-head">
+      <h3>🅰️ 艺术字 · 印章</h3>
+      <button class="modal-close" id="ts-close" title="关闭">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-sub">输入文字 → 选风格 → 点画板任意位置盖章（不会清空原图）</div>
+      <div class="ts-row">
+        <label class="ts-lbl">文字</label>
+        <textarea id="ts-text" maxlength="40" placeholder="输入中英文（最多 4 行，每行 12 字）" rows="2"></textarea>
+      </div>
+      <div class="ts-row">
+        <label class="ts-lbl">字体风格</label>
+        <div class="ts-fonts" id="ts-fonts"></div>
+      </div>
+      <div class="ts-row ts-row-inline">
+        <div class="ts-col">
+          <label class="ts-lbl">主色</label>
+          <div class="ts-color-trigger" id="ts-main-trigger" data-target="main"><span class="ts-color-dot" id="ts-main-swatch"></span><span id="ts-main-id">点选</span></div>
+        </div>
+        <div class="ts-col">
+          <label class="ts-lbl">
+            <input type="checkbox" id="ts-stroke-toggle" checked /> 描边
+          </label>
+          <div class="ts-color-trigger" id="ts-stroke-trigger" data-target="stroke"><span class="ts-color-dot" id="ts-stroke-swatch"></span><span id="ts-stroke-id">点选</span></div>
+        </div>
+        <div class="ts-col">
+          <label class="ts-lbl">描边宽度 <span id="ts-stroke-w-val">2</span></label>
+          <input type="range" id="ts-stroke-w" min="1" max="3" step="1" value="2" />
+        </div>
+      </div>
+      <div class="ts-row">
+        <label class="ts-lbl">预览</label>
+        <div class="ts-preview-wrap">
+          <canvas id="ts-preview"></canvas>
+          <div class="ts-preview-status" id="ts-preview-status"></div>
+        </div>
+      </div>
+      <!-- Mini palette popover for picking text colors -->
+      <div class="ts-color-pop" id="ts-color-pop" hidden></div>
+      <div class="modal-footer">
+        <button class="modal-cancel" id="ts-cancel">取消</button>
+        <button class="compare-pick" id="ts-go">生成印章 →</button>
       </div>
     </div>
   </div>
@@ -3791,6 +4004,496 @@ document.getElementById('bg-ml-toggle').addEventListener('change', () => {
   });
 })();
 
+/* ============== Text Stamp (artistic word art, 印章) ==============
+   Rasterize user text via Canvas fillText (system font + Google Fonts subset)
+   then commit to state.grid as a "stamp". Click anywhere on the canvas to
+   place it; ESC / right-click cancels. Doesn't clear existing artwork. */
+
+const TS_FONTS = [
+  { id: 'heavy', name: '极粗黑体', glyph: '永', stack: "'PingFang SC', 'Microsoft YaHei', sans-serif", weight: 900, isWeb: false },
+  { id: 'kuaile', name: '站酷快乐', glyph: '快', stack: "'ZCOOL KuaiLe', cursive", weight: 400, isWeb: true, googleName: 'ZCOOL+KuaiLe' },
+  { id: 'xiaowei', name: '复古优雅', glyph: '优', stack: "'ZCOOL XiaoWei', serif", weight: 400, isWeb: true, googleName: 'ZCOOL+XiaoWei' },
+  { id: 'mashan', name: '毛笔楷书', glyph: '墨', stack: "'Ma Shan Zheng', cursive", weight: 400, isWeb: true, googleName: 'Ma+Shan+Zheng' },
+  { id: 'longcang', name: '龙藏行书', glyph: '龍', stack: "'Long Cang', cursive", weight: 400, isWeb: true, googleName: 'Long+Cang' },
+  { id: 'huangyou', name: '装饰复古', glyph: '酷', stack: "'ZCOOL QingKe HuangYou', cursive", weight: 400, isWeb: true, googleName: 'ZCOOL+QingKe+HuangYou' },
+  { id: 'kaiti', name: '楷体', glyph: '楷', stack: "'KaiTi', '楷体', 'STKaiti', serif", weight: 400, isWeb: false },
+  { id: 'song', name: '宋体粗', glyph: '宋', stack: "'STSong', '宋体', 'Source Han Serif SC', serif", weight: 700, isWeb: false },
+  { id: 'mono', name: '等宽粗', glyph: 'A', stack: "'JetBrains Mono', 'Courier New', monospace", weight: 700, isWeb: false },
+  { id: 'bit', name: '8-bit 英文', glyph: 'P', stack: "'Press Start 2P', monospace", weight: 400, isWeb: true, googleName: 'Press+Start+2P' },
+];
+
+const tsState = {
+  text: '',
+  fontId: 'heavy',
+  mainColorId: null,    // MARD id or null → falls back to state.selectedColorId
+  strokeOn: true,
+  strokeColorId: null,
+  strokeW: 2,
+  loadedFonts: new Set(),
+  lastStamp: null,      // { grid: [[id|null,...]], w, h }
+};
+
+function tsCurrentMainHex() {
+  const id = tsState.mainColorId || state.selectedColorId || (PALETTE[0] && PALETTE[0].id);
+  return (PALETTE_BY_ID[id] && PALETTE_BY_ID[id].hex) || '#ff8fab';
+}
+function tsCurrentStrokeHex() {
+  const id = tsState.strokeColorId;
+  if (id && PALETTE_BY_ID[id]) return PALETTE_BY_ID[id].hex;
+  // Smart default: contrast against main
+  const main = tsCurrentMainHex();
+  const r = parseInt(main.slice(1,3),16), g = parseInt(main.slice(3,5),16), b = parseInt(main.slice(5,7),16);
+  const lum = 0.299*r + 0.587*g + 0.114*b;
+  return lum > 160 ? '#000000' : '#FFFFFF';
+}
+
+async function tsLoadFont(fontId) {
+  const def = TS_FONTS.find(f => f.id === fontId);
+  if (!def || !def.isWeb || tsState.loadedFonts.has(def.id)) return;
+  const text = tsState.text || def.glyph;
+  const sub = encodeURIComponent(text);
+  const url = `https://fonts.googleapis.com/css2?family=${def.googleName}&text=${sub}&display=swap`;
+  // Inject (or replace) the per-font stylesheet so subset reflects current text.
+  const linkId = `ts-font-link-${def.id}`;
+  let link = document.getElementById(linkId);
+  if (!link) {
+    link = document.createElement('link');
+    link.id = linkId;
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+  }
+  link.href = url;
+  // Wait for the actual font face to load with these characters.
+  try {
+    await document.fonts.load(`${def.weight} 64px ${def.stack.split(',')[0].trim()}`, text);
+    tsState.loadedFonts.add(def.id);
+  } catch (e) {
+    console.warn('[ts] font load failed', def.id, e);
+  }
+}
+
+/* Build a hidden canvas, render text with stroke+fill at super-sampled
+   resolution, then downsample by majority sampling to a gridW × gridH cell
+   matrix. Each cell is null or a MARD bead id. */
+async function tsRasterizeStamp(opts) {
+  const { text, fontId, mainHex, strokeHex, strokeW, gridMaxW, gridMaxH } = opts;
+  if (!text || !text.trim()) return null;
+  const def = TS_FONTS.find(f => f.id === fontId) || TS_FONTS[0];
+  await tsLoadFont(fontId);
+  const lines = text.split(/\r?\n/).slice(0, 4);
+  if (lines.length === 0) return null;
+  const longestLine = lines.reduce((m, l) => Math.max(m, l.length), 0);
+  if (!longestLine) return null;
+  // Pick a font size in canvas pixels. Bigger = more crisp glyph, fewer cells per line.
+  // We render at gridMax × superScale and aim for the glyph height ≈ gridMaxH/lines.
+  const ss = 4;
+  // Estimate font px so each line fits roughly gridMaxH/lines × 4
+  const lineFitPx = Math.floor((gridMaxH * ss) / lines.length * 0.92);
+  const widthFitPx = Math.floor((gridMaxW * ss) / Math.max(1, longestLine) * 1.6);
+  let fontPx = Math.min(lineFitPx, widthFitPx);
+  fontPx = Math.max(8, Math.min(fontPx, 240));
+  const off = document.createElement('canvas');
+  off.width = gridMaxW * ss;
+  off.height = gridMaxH * ss;
+  const cx = off.getContext('2d', { willReadFrequently: true });
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = 'high';
+  cx.font = `${def.weight} ${fontPx}px ${def.stack}`;
+  cx.textBaseline = 'middle';
+  cx.textAlign = 'center';
+  cx.lineJoin = 'round';
+  // Draw lines centered vertically.
+  const totalH = fontPx * lines.length * 1.04;
+  const top = (off.height - totalH) / 2 + fontPx / 2;
+  // Stroke layer (pure stroke color).
+  if (strokeW > 0) {
+    cx.lineWidth = strokeW * ss * 1.6;
+    cx.strokeStyle = strokeHex;
+    for (let i = 0; i < lines.length; i++) {
+      const y = top + i * fontPx * 1.04;
+      cx.strokeText(lines[i], off.width / 2, y);
+    }
+  }
+  // Fill layer (main color).
+  cx.fillStyle = mainHex;
+  for (let i = 0; i < lines.length; i++) {
+    const y = top + i * fontPx * 1.04;
+    cx.fillText(lines[i], off.width / 2, y);
+  }
+  // Sample down: each gridMaxW × gridMaxH cell averages ss×ss canvas pixels.
+  const data = cx.getImageData(0, 0, off.width, off.height).data;
+  const grid = makeGrid(Math.max(gridMaxW, gridMaxH));
+  // build [gridMaxH][gridMaxW]
+  const out = [];
+  for (let y = 0; y < gridMaxH; y++) {
+    out.push(new Array(gridMaxW).fill(null));
+  }
+  // Pre-compute lab of main and stroke for class assignment.
+  const mainRgb = [parseInt(mainHex.slice(1,3),16), parseInt(mainHex.slice(3,5),16), parseInt(mainHex.slice(5,7),16)];
+  const strokeRgb = [parseInt(strokeHex.slice(1,3),16), parseInt(strokeHex.slice(3,5),16), parseInt(strokeHex.slice(5,7),16)];
+  const mainId = findNearestColor(mainRgb).id;
+  const strokeId = findNearestColor(strokeRgb).id;
+  let minX = gridMaxW, minY = gridMaxH, maxX = 0, maxY = 0, anyFilled = false;
+  for (let gy = 0; gy < gridMaxH; gy++) {
+    for (let gx = 0; gx < gridMaxW; gx++) {
+      let aSum = 0, rSum = 0, gSum = 0, bSum = 0, n = 0;
+      for (let py = gy * ss; py < (gy + 1) * ss; py++) {
+        for (let px = gx * ss; px < (gx + 1) * ss; px++) {
+          const idx = (py * off.width + px) * 4;
+          const a = data[idx + 3];
+          if (a < 32) continue;
+          aSum += a; rSum += data[idx]; gSum += data[idx+1]; bSum += data[idx+2]; n++;
+        }
+      }
+      if (n === 0 || aSum / (ss * ss) < 60) continue;
+      // Decide whether this cell looks more like main or stroke.
+      const avgR = rSum / n, avgG = gSum / n, avgB = bSum / n;
+      const dMain = (avgR-mainRgb[0])**2 + (avgG-mainRgb[1])**2 + (avgB-mainRgb[2])**2;
+      const dStroke = strokeW > 0 ? ((avgR-strokeRgb[0])**2 + (avgG-strokeRgb[1])**2 + (avgB-strokeRgb[2])**2) : Infinity;
+      out[gy][gx] = (dStroke < dMain) ? strokeId : mainId;
+      anyFilled = true;
+      if (gx < minX) minX = gx; if (gy < minY) minY = gy;
+      if (gx > maxX) maxX = gx; if (gy > maxY) maxY = gy;
+    }
+  }
+  if (!anyFilled) return null;
+  // Crop tight bounding box so the stamp doesn't carry empty padding.
+  const cw = maxX - minX + 1, ch = maxY - minY + 1;
+  const cropped = [];
+  for (let y = 0; y < ch; y++) {
+    cropped.push(out[minY + y].slice(minX, maxX + 1));
+  }
+  return { grid: cropped, w: cw, h: ch };
+}
+
+/* Render the rasterized grid into a small preview canvas (dot per bead). */
+function tsRenderPreview(stamp) {
+  const c = document.getElementById('ts-preview');
+  if (!c) return;
+  if (!stamp) { c.width = 200; c.height = 80; const cx = c.getContext('2d'); cx.clearRect(0,0,c.width,c.height); return; }
+  const cell = 8;
+  c.width = stamp.w * cell;
+  c.height = stamp.h * cell;
+  const cx = c.getContext('2d');
+  cx.clearRect(0, 0, c.width, c.height);
+  for (let y = 0; y < stamp.h; y++) {
+    for (let x = 0; x < stamp.w; x++) {
+      const id = stamp.grid[y][x];
+      if (!id) continue;
+      const col = PALETTE_BY_ID[id];
+      if (!col) continue;
+      cx.fillStyle = col.hex;
+      cx.beginPath();
+      cx.arc(x * cell + cell/2, y * cell + cell/2, cell * 0.42, 0, Math.PI * 2);
+      cx.fill();
+    }
+  }
+}
+
+/* Recompute preview based on current modal inputs (debounced). */
+let tsPreviewTimer = null;
+function tsSchedulePreview() {
+  if (tsPreviewTimer) clearTimeout(tsPreviewTimer);
+  const status = document.getElementById('ts-preview-status');
+  if (status) status.textContent = '';
+  tsPreviewTimer = setTimeout(async () => {
+    const text = (document.getElementById('ts-text')?.value || '').trim();
+    if (!text) {
+      tsRenderPreview(null);
+      if (status) status.textContent = '请输入文字';
+      return;
+    }
+    if (status) status.textContent = '渲染中...';
+    try {
+      const stamp = await tsRasterizeStamp({
+        text,
+        fontId: tsState.fontId,
+        mainHex: tsCurrentMainHex(),
+        strokeHex: tsCurrentStrokeHex(),
+        strokeW: tsState.strokeOn ? tsState.strokeW : 0,
+        gridMaxW: state.size,
+        gridMaxH: state.size,
+      });
+      tsState.lastStamp = stamp;
+      tsRenderPreview(stamp);
+      if (status) status.textContent = stamp ? '' : '文字太大或过小，调整后再试';
+    } catch (e) {
+      console.warn('[ts] preview failed', e);
+      if (status) status.textContent = '预览失败：' + (e?.message || e);
+    }
+  }, 250);
+}
+
+/* Build font-card grid in the modal. */
+function tsBuildFontGrid() {
+  const wrap = document.getElementById('ts-fonts');
+  if (!wrap || wrap.dataset.built === '1') return;
+  wrap.dataset.built = '1';
+  TS_FONTS.forEach(def => {
+    const card = document.createElement('div');
+    card.className = 'ts-font-card' + (def.id === tsState.fontId ? ' active' : '');
+    card.dataset.fontId = def.id;
+    const glyph = document.createElement('div');
+    glyph.className = 'ts-font-glyph';
+    glyph.style.fontFamily = def.stack;
+    glyph.style.fontWeight = def.weight;
+    glyph.textContent = def.glyph;
+    const name = document.createElement('div');
+    name.className = 'ts-font-name';
+    name.textContent = def.name;
+    card.appendChild(glyph);
+    card.appendChild(name);
+    card.addEventListener('click', async () => {
+      tsState.fontId = def.id;
+      wrap.querySelectorAll('.ts-font-card').forEach(x => x.classList.toggle('active', x === card));
+      // Eagerly load web fonts for the card glyph so the next preview is instant.
+      if (def.isWeb) tsLoadFont(def.id);
+      tsSchedulePreview();
+    });
+    wrap.appendChild(card);
+  });
+}
+
+/* MARD color popover for picking text colors. */
+function tsOpenColorPop(target, anchorEl) {
+  const pop = document.getElementById('ts-color-pop');
+  if (!pop) return;
+  pop.innerHTML = '';
+  const currentId = target === 'stroke' ? tsState.strokeColorId : tsState.mainColorId;
+  PALETTE.forEach(c => {
+    const dot = document.createElement('button');
+    dot.className = 'ts-color-pop-dot' + (c.id === currentId ? ' active' : '');
+    dot.style.background = c.hex;
+    dot.title = `${c.id} · ${c.hex}`;
+    dot.addEventListener('click', () => {
+      if (target === 'stroke') tsState.strokeColorId = c.id;
+      else tsState.mainColorId = c.id;
+      tsRefreshColorTriggers();
+      pop.hidden = true;
+      tsSchedulePreview();
+    });
+    pop.appendChild(dot);
+  });
+  pop.hidden = false;
+  // Position next to the trigger button.
+  const r = anchorEl.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(window.innerWidth - 290, r.left)) + 'px';
+  pop.style.top = Math.min(window.innerHeight - 330, r.bottom + 6) + 'px';
+}
+function tsCloseColorPop() { const p = document.getElementById('ts-color-pop'); if (p) p.hidden = true; }
+function tsRefreshColorTriggers() {
+  const ms = document.getElementById('ts-main-swatch');
+  const mid = document.getElementById('ts-main-id');
+  if (ms) ms.style.background = tsCurrentMainHex();
+  if (mid) mid.textContent = tsState.mainColorId || '跟随选中色';
+  const ss = document.getElementById('ts-stroke-swatch');
+  const sid = document.getElementById('ts-stroke-id');
+  if (ss) ss.style.background = tsCurrentStrokeHex();
+  if (sid) sid.textContent = tsState.strokeColorId || (tsState.strokeOn ? '自动对比' : '关闭');
+}
+
+function tsOpenModal() {
+  const m = document.getElementById('textstamp-modal');
+  if (!m) return;
+  tsBuildFontGrid();
+  // Eagerly load default web font so first preview is fast.
+  const def = TS_FONTS.find(f => f.id === tsState.fontId);
+  if (def?.isWeb) tsLoadFont(def.id);
+  tsRefreshColorTriggers();
+  m.classList.add('open');
+  setTimeout(() => document.getElementById('ts-text')?.focus(), 50);
+  tsSchedulePreview();
+}
+function tsCloseModal() {
+  document.getElementById('textstamp-modal')?.classList.remove('open');
+  tsCloseColorPop();
+}
+
+/* ========== Stamping mode (after pressing 生成印章) ========== */
+function tsStartStamping(stamp) {
+  if (!stamp || !stamp.grid) return;
+  state.stamping = {
+    grid: stamp.grid,
+    w: stamp.w,
+    h: stamp.h,
+    anchor: { x: Math.max(0, ((state.size - stamp.w) / 2) | 0), y: Math.max(0, ((state.size - stamp.h) / 2) | 0) },
+  };
+  document.body.classList.add('stamping-cursor');
+  ensureStampOverlay();
+  positionStampOverlay();
+  showToast('点画板任意位置盖章；ESC 或右键取消', 'info');
+}
+function tsEndStamping(commit) {
+  if (!state.stamping) return;
+  if (commit) {
+    pushHistory();
+    const { grid: sg, w, h, anchor } = state.stamping;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const id = sg[y][x];
+        if (!id) continue;
+        const gx = anchor.x + x, gy = anchor.y + y;
+        if (gx >= 0 && gx < state.size && gy >= 0 && gy < state.size) {
+          state.grid[gy][gx] = id;
+        }
+      }
+    }
+    refreshActionBar?.();
+    renderMaterials?.();
+    renderPalette?.();
+    renderCanvas();
+  }
+  state.stamping = null;
+  document.body.classList.remove('stamping-cursor');
+  removeStampOverlay();
+}
+function ensureStampOverlay() {
+  let ov = document.getElementById('stamp-overlay-canvas');
+  if (ov) return ov;
+  const wrap = document.getElementById('canvas-wrap');
+  if (!wrap) return null;
+  ov = document.createElement('canvas');
+  ov.id = 'stamp-overlay-canvas';
+  ov.className = 'stamp-overlay';
+  wrap.appendChild(ov);
+  return ov;
+}
+function removeStampOverlay() {
+  document.getElementById('stamp-overlay-canvas')?.remove();
+}
+function positionStampOverlay() {
+  if (!state.stamping) return;
+  const ov = document.getElementById('stamp-overlay-canvas');
+  const wrap = document.getElementById('canvas-wrap');
+  if (!ov || !wrap || !canvas) return;
+  const { grid: sg, w, h, anchor } = state.stamping;
+  const cw = canvas.width * state.zoom;
+  const ch = canvas.height * state.zoom;
+  const left0 = wrap.clientWidth / 2 - cw / 2 + state.pan.x;
+  const top0 = wrap.clientHeight / 2 - ch / 2 + state.pan.y;
+  const cellPx = (canvas.width / state.size) * state.zoom;
+  // Draw on overlay canvas at css px so it lines up with the underlying grid.
+  ov.width = w * cellPx;
+  ov.height = h * cellPx;
+  ov.style.width = ov.width + 'px';
+  ov.style.height = ov.height + 'px';
+  ov.style.left = (left0 + anchor.x * cellPx) + 'px';
+  ov.style.top = (top0 + anchor.y * cellPx) + 'px';
+  const ctx = ov.getContext('2d');
+  ctx.clearRect(0, 0, ov.width, ov.height);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const id = sg[y][x];
+      if (!id) continue;
+      const col = PALETTE_BY_ID[id];
+      if (!col) continue;
+      ctx.fillStyle = col.hex;
+      ctx.beginPath();
+      ctx.arc(x * cellPx + cellPx / 2, y * cellPx + cellPx / 2, cellPx * 0.42, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+/* Move stamp anchor to follow the bead under the mouse, clamped to canvas. */
+function tsMoveStampToClient(clientX, clientY) {
+  if (!state.stamping || !canvas) return;
+  const r = canvas.getBoundingClientRect();
+  const cellPx = r.width / state.size;
+  const gx = Math.floor((clientX - r.left) / cellPx);
+  const gy = Math.floor((clientY - r.top) / cellPx);
+  // Center the stamp on the cursor.
+  const ax = Math.max(0, Math.min(state.size - state.stamping.w, gx - ((state.stamping.w / 2) | 0)));
+  const ay = Math.max(0, Math.min(state.size - state.stamping.h, gy - ((state.stamping.h / 2) | 0)));
+  if (ax !== state.stamping.anchor.x || ay !== state.stamping.anchor.y) {
+    state.stamping.anchor = { x: ax, y: ay };
+    positionStampOverlay();
+  }
+}
+
+/* ============== Wire up DOM ============== */
+(function setupTextStamp() {
+  const btn = document.getElementById('btn-textstamp');
+  if (btn) btn.addEventListener('click', tsOpenModal);
+  document.getElementById('ts-close')?.addEventListener('click', tsCloseModal);
+  document.getElementById('ts-cancel')?.addEventListener('click', tsCloseModal);
+  document.getElementById('ts-text')?.addEventListener('input', () => {
+    tsState.text = document.getElementById('ts-text').value;
+    // Reload the active web-font subset to include any new characters.
+    const def = TS_FONTS.find(f => f.id === tsState.fontId);
+    if (def?.isWeb) {
+      tsState.loadedFonts.delete(def.id);
+      tsLoadFont(def.id);
+    }
+    tsSchedulePreview();
+  });
+  document.getElementById('ts-stroke-toggle')?.addEventListener('change', (e) => {
+    tsState.strokeOn = e.target.checked;
+    tsRefreshColorTriggers();
+    tsSchedulePreview();
+  });
+  const sw = document.getElementById('ts-stroke-w');
+  if (sw) sw.addEventListener('input', () => {
+    tsState.strokeW = parseInt(sw.value, 10);
+    document.getElementById('ts-stroke-w-val').textContent = sw.value;
+    tsSchedulePreview();
+  });
+  ['main', 'stroke'].forEach(target => {
+    const el = document.getElementById(`ts-${target}-trigger`);
+    if (!el) return;
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const pop = document.getElementById('ts-color-pop');
+      if (!pop.hidden && pop.dataset.target === target) {
+        pop.hidden = true;
+        return;
+      }
+      pop.dataset.target = target;
+      tsOpenColorPop(target, el);
+    });
+  });
+  document.addEventListener('click', (e) => {
+    const pop = document.getElementById('ts-color-pop');
+    if (!pop || pop.hidden) return;
+    if (pop.contains(e.target)) return;
+    if (e.target.closest('.ts-color-trigger')) return;
+    pop.hidden = true;
+  });
+  document.getElementById('ts-go')?.addEventListener('click', () => {
+    if (!tsState.lastStamp) {
+      showToast('请先输入文字预览', 'warn');
+      return;
+    }
+    tsCloseModal();
+    tsStartStamping(tsState.lastStamp);
+  });
+  // Stamping interactions on the editor canvas (mousemove + click + ESC + RMB).
+  const wrap = document.getElementById('canvas-wrap');
+  if (wrap) {
+    wrap.addEventListener('mousemove', (e) => {
+      if (state.stamping) tsMoveStampToClient(e.clientX, e.clientY);
+    });
+    wrap.addEventListener('click', (e) => {
+      if (state.stamping) {
+        e.preventDefault();
+        e.stopPropagation();
+        tsEndStamping(true);
+      }
+    }, true);
+    wrap.addEventListener('contextmenu', (e) => {
+      if (state.stamping) {
+        e.preventDefault();
+        tsEndStamping(false);
+      }
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    if (state.stamping && (e.key === 'Escape' || e.key === 'Esc')) {
+      tsEndStamping(false);
+    }
+  });
+})();
+
 /* ============== Tooltip (portal) ============== */
 (function setupTooltip() {
   let tipEl = null;
@@ -4284,6 +4987,8 @@ function applyTransform() {
     if (v === 'fit') return;
     b.classList.toggle('current', Math.abs(state.zoom - parseFloat(v)) < 0.01);
   });
+  // Reposition the stamp overlay so it tracks zoom/pan changes.
+  if (state.stamping) positionStampOverlay();
 }
 function fitCanvas() {
   const wrap = document.getElementById('canvas-wrap');
@@ -4401,6 +5106,16 @@ function fillBucket(x, y) {
 wrap.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   wrap.setPointerCapture(e.pointerId);
+  // While stamping, hijack pointerdown: left click commits, right click cancels.
+  if (state.stamping) {
+    if (e.button === 2) {
+      tsEndStamping(false);
+    } else {
+      tsMoveStampToClient(e.clientX, e.clientY);
+      tsEndStamping(true);
+    }
+    return;
+  }
   if (state.tool === 'pan' || e.button === 1 || e.shiftKey) {
     pointerState = { mode: 'pan', startX: e.clientX, startY: e.clientY, panX: state.pan.x, panY: state.pan.y };
     canvas.style.cursor = 'grabbing';
@@ -4424,6 +5139,10 @@ wrap.addEventListener('pointerdown', (e) => {
   if (pointerState.changed) renderCanvas();
 });
 wrap.addEventListener('pointermove', (e) => {
+  if (state.stamping) {
+    tsMoveStampToClient(e.clientX, e.clientY);
+    return;
+  }
   if (pointerState?.mode === 'pan') {
     state.pan.x = pointerState.panX + (e.clientX - pointerState.startX);
     state.pan.y = pointerState.panY + (e.clientY - pointerState.startY);
