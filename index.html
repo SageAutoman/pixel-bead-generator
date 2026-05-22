@@ -1586,11 +1586,36 @@
     background: var(--c-paper);
     border: 1px solid var(--c-border);
     border-radius: var(--r-md);
-    padding: 10px;
+    padding: 8px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
     z-index: 1100;
     max-width: 280px;
-    max-height: 320px;
+    max-height: 360px;
+    display: flex;
+    flex-direction: column;
+  }
+  .ts-color-pop-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 4px 8px;
+    border-bottom: 1px solid var(--c-border);
+    margin-bottom: 6px;
+  }
+  .ts-color-pop-title { font-size: 12px; font-weight: 700; color: var(--c-text); }
+  .ts-color-pop-close {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--c-text-3);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: var(--r-sm);
+  }
+  .ts-color-pop-close:hover { background: var(--c-toolbar-bg); color: var(--c-secondary); }
+  .ts-color-pop-grid {
     overflow-y: auto;
     display: grid;
     grid-template-columns: repeat(auto-fill, 24px);
@@ -1609,6 +1634,29 @@
   }
   .ts-color-pop .ts-color-pop-dot:hover { transform: scale(1.18); z-index: 1; }
   .ts-color-pop .ts-color-pop-dot.active { box-shadow: 0 0 0 2px var(--c-secondary); }
+  .ts-sizes {
+    display: inline-flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .ts-size-seg {
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--c-border);
+    background: var(--c-paper);
+    color: var(--c-text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .ts-size-seg:hover { background: var(--c-toolbar-bg); }
+  .ts-size-seg.active {
+    background: var(--c-primary);
+    border-color: var(--c-primary);
+    color: white;
+    font-weight: 600;
+  }
   /* Stamp overlay (rendered as semi-transparent grid floating on canvas) */
   .stamp-overlay {
     position: absolute;
@@ -2174,6 +2222,10 @@
         <label class="ts-lbl">字体风格</label>
         <div class="ts-fonts" id="ts-fonts"></div>
       </div>
+      <div class="ts-row">
+        <label class="ts-lbl">字号</label>
+        <div class="ts-sizes" id="ts-sizes"></div>
+      </div>
       <div class="ts-row ts-row-inline">
         <div class="ts-col">
           <label class="ts-lbl">主色</label>
@@ -2198,7 +2250,13 @@
         </div>
       </div>
       <!-- Mini palette popover for picking text colors -->
-      <div class="ts-color-pop" id="ts-color-pop" hidden></div>
+      <div class="ts-color-pop" id="ts-color-pop" hidden>
+        <div class="ts-color-pop-head">
+          <span class="ts-color-pop-title" id="ts-color-pop-title">选色</span>
+          <button class="ts-color-pop-close" id="ts-color-pop-close" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="ts-color-pop-grid" id="ts-color-pop-grid"></div>
+      </div>
       <div class="modal-footer">
         <button class="modal-cancel" id="ts-cancel">取消</button>
         <button class="compare-pick" id="ts-go">生成印章 →</button>
@@ -4011,20 +4069,34 @@ document.getElementById('bg-ml-toggle').addEventListener('change', () => {
 
 const TS_FONTS = [
   { id: 'heavy', name: '极粗黑体', glyph: '永', stack: "'PingFang SC', 'Microsoft YaHei', sans-serif", weight: 900, isWeb: false },
+  { id: 'noto', name: '思源黑超粗', glyph: '黑', stack: "'Noto Sans SC', sans-serif", weight: 900, isWeb: true, googleName: 'Noto+Sans+SC:wght@900' },
   { id: 'kuaile', name: '站酷快乐', glyph: '快', stack: "'ZCOOL KuaiLe', cursive", weight: 400, isWeb: true, googleName: 'ZCOOL+KuaiLe' },
   { id: 'xiaowei', name: '复古优雅', glyph: '优', stack: "'ZCOOL XiaoWei', serif", weight: 400, isWeb: true, googleName: 'ZCOOL+XiaoWei' },
-  { id: 'mashan', name: '毛笔楷书', glyph: '墨', stack: "'Ma Shan Zheng', cursive", weight: 400, isWeb: true, googleName: 'Ma+Shan+Zheng' },
-  { id: 'longcang', name: '龙藏行书', glyph: '龍', stack: "'Long Cang', cursive", weight: 400, isWeb: true, googleName: 'Long+Cang' },
   { id: 'huangyou', name: '装饰复古', glyph: '酷', stack: "'ZCOOL QingKe HuangYou', cursive", weight: 400, isWeb: true, googleName: 'ZCOOL+QingKe+HuangYou' },
+  { id: 'mashan', name: '毛笔楷书', glyph: '墨', stack: "'Ma Shan Zheng', cursive", weight: 400, isWeb: true, googleName: 'Ma+Shan+Zheng' },
+  { id: 'liujian', name: '毛笔草书', glyph: '草', stack: "'Liu Jian Mao Cao', cursive", weight: 400, isWeb: true, googleName: 'Liu+Jian+Mao+Cao' },
+  { id: 'longcang', name: '龙藏行书', glyph: '龍', stack: "'Long Cang', cursive", weight: 400, isWeb: true, googleName: 'Long+Cang' },
+  { id: 'zhimang', name: '智芒星', glyph: '星', stack: "'Zhi Mang Xing', cursive", weight: 400, isWeb: true, googleName: 'Zhi+Mang+Xing' },
   { id: 'kaiti', name: '楷体', glyph: '楷', stack: "'KaiTi', '楷体', 'STKaiti', serif", weight: 400, isWeb: false },
   { id: 'song', name: '宋体粗', glyph: '宋', stack: "'STSong', '宋体', 'Source Han Serif SC', serif", weight: 700, isWeb: false },
+  { id: 'fang', name: '仿宋', glyph: '仿', stack: "'FangSong', '仿宋', 'STFangsong', serif", weight: 400, isWeb: false },
+  { id: 'lisu', name: '隶书', glyph: '隸', stack: "'LiSu', '隶书', 'STLiti', serif", weight: 400, isWeb: false },
   { id: 'mono', name: '等宽粗', glyph: 'A', stack: "'JetBrains Mono', 'Courier New', monospace", weight: 700, isWeb: false },
   { id: 'bit', name: '8-bit 英文', glyph: 'P', stack: "'Press Start 2P', monospace", weight: 400, isWeb: true, googleName: 'Press+Start+2P' },
+];
+
+const TS_SIZES = [
+  { id: 'tiny', name: '迷你', factor: 0.35 },
+  { id: 'small', name: '小', factor: 0.5 },
+  { id: 'medium', name: '中', factor: 0.7 },
+  { id: 'large', name: '大', factor: 0.85 },
+  { id: 'xlarge', name: '满版', factor: 1.0 },
 ];
 
 const tsState = {
   text: '',
   fontId: 'heavy',
+  sizeId: 'medium',
   mainColorId: null,    // MARD id or null → falls back to state.selectedColorId
   strokeOn: true,
   strokeColorId: null,
@@ -4205,14 +4277,16 @@ function tsSchedulePreview() {
     }
     if (status) status.textContent = '渲染中...';
     try {
+      const sizeDef = TS_SIZES.find(s => s.id === tsState.sizeId) || TS_SIZES[2];
+      const cap = Math.max(8, Math.round(state.size * sizeDef.factor));
       const stamp = await tsRasterizeStamp({
         text,
         fontId: tsState.fontId,
         mainHex: tsCurrentMainHex(),
         strokeHex: tsCurrentStrokeHex(),
         strokeW: tsState.strokeOn ? tsState.strokeW : 0,
-        gridMaxW: state.size,
-        gridMaxH: state.size,
+        gridMaxW: cap,
+        gridMaxH: cap,
       });
       tsState.lastStamp = stamp;
       tsRenderPreview(stamp);
@@ -4254,31 +4328,56 @@ function tsBuildFontGrid() {
   });
 }
 
+/* Build the font-size segmented control. */
+function tsBuildSizeSegs() {
+  const wrap = document.getElementById('ts-sizes');
+  if (!wrap || wrap.dataset.built === '1') return;
+  wrap.dataset.built = '1';
+  TS_SIZES.forEach(def => {
+    const seg = document.createElement('button');
+    seg.type = 'button';
+    seg.className = 'ts-size-seg' + (def.id === tsState.sizeId ? ' active' : '');
+    seg.textContent = def.name;
+    seg.dataset.sizeId = def.id;
+    seg.addEventListener('click', () => {
+      tsState.sizeId = def.id;
+      wrap.querySelectorAll('.ts-size-seg').forEach(x => x.classList.toggle('active', x === seg));
+      tsSchedulePreview();
+    });
+    wrap.appendChild(seg);
+  });
+}
+
 /* MARD color popover for picking text colors. */
 function tsOpenColorPop(target, anchorEl) {
   const pop = document.getElementById('ts-color-pop');
   if (!pop) return;
-  pop.innerHTML = '';
-  const currentId = target === 'stroke' ? tsState.strokeColorId : tsState.mainColorId;
-  PALETTE.forEach(c => {
-    const dot = document.createElement('button');
-    dot.className = 'ts-color-pop-dot' + (c.id === currentId ? ' active' : '');
-    dot.style.background = c.hex;
-    dot.title = `${c.id} · ${c.hex}`;
-    dot.addEventListener('click', () => {
-      if (target === 'stroke') tsState.strokeColorId = c.id;
-      else tsState.mainColorId = c.id;
-      tsRefreshColorTriggers();
-      pop.hidden = true;
-      tsSchedulePreview();
+  const grid = document.getElementById('ts-color-pop-grid');
+  const title = document.getElementById('ts-color-pop-title');
+  if (title) title.textContent = target === 'stroke' ? '描边色' : '主色';
+  if (grid) {
+    grid.innerHTML = '';
+    const currentId = target === 'stroke' ? tsState.strokeColorId : tsState.mainColorId;
+    PALETTE.forEach(c => {
+      const dot = document.createElement('button');
+      dot.className = 'ts-color-pop-dot' + (c.id === currentId ? ' active' : '');
+      dot.style.background = c.hex;
+      dot.title = `${c.id} · ${c.hex}`;
+      dot.addEventListener('click', () => {
+        if (target === 'stroke') tsState.strokeColorId = c.id;
+        else tsState.mainColorId = c.id;
+        tsRefreshColorTriggers();
+        pop.hidden = true;
+        tsSchedulePreview();
+      });
+      grid.appendChild(dot);
     });
-    pop.appendChild(dot);
-  });
+  }
   pop.hidden = false;
   // Position next to the trigger button.
   const r = anchorEl.getBoundingClientRect();
   pop.style.left = Math.max(8, Math.min(window.innerWidth - 290, r.left)) + 'px';
-  pop.style.top = Math.min(window.innerHeight - 330, r.bottom + 6) + 'px';
+  pop.style.top = Math.min(window.innerHeight - 360, r.bottom + 6) + 'px';
 }
 function tsCloseColorPop() { const p = document.getElementById('ts-color-pop'); if (p) p.hidden = true; }
 function tsRefreshColorTriggers() {
@@ -4296,6 +4395,7 @@ function tsOpenModal() {
   const m = document.getElementById('textstamp-modal');
   if (!m) return;
   tsBuildFontGrid();
+  tsBuildSizeSegs();
   // Eagerly load default web font so first preview is fast.
   const def = TS_FONTS.find(f => f.id === tsState.fontId);
   if (def?.isWeb) tsLoadFont(def.id);
@@ -4487,7 +4587,14 @@ function tsMoveStampToClient(clientX, clientY) {
       }
     });
   }
+  document.getElementById('ts-color-pop-close')?.addEventListener('click', tsCloseColorPop);
   document.addEventListener('keydown', (e) => {
+    const pop = document.getElementById('ts-color-pop');
+    if (pop && !pop.hidden && (e.key === 'Escape' || e.key === 'Esc')) {
+      e.stopPropagation();
+      tsCloseColorPop();
+      return;
+    }
     if (state.stamping && (e.key === 'Escape' || e.key === 'Esc')) {
       tsEndStamping(false);
     }
