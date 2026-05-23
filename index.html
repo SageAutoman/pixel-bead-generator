@@ -1520,6 +1520,19 @@
     color: var(--c-text-2);
     font-weight: 600;
   }
+  .ts-font-card.en-only { position: relative; }
+  .ts-font-card .ts-en-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: var(--c-accent, #a2d2ff);
+    color: #0c3a66;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 999px;
+    letter-spacing: 0.06em;
+  }
   .ts-color-trigger {
     display: inline-flex;
     align-items: center;
@@ -4078,14 +4091,9 @@ const TS_FONTS = [
   { id: 'longcang', name: '龙藏行书', glyph: '龍', stack: "'Long Cang', cursive", weight: 400, isWeb: true, googleName: 'Long+Cang' },
   { id: 'zhimang', name: '智芒星', glyph: '星', stack: "'Zhi Mang Xing', cursive", weight: 400, isWeb: true, googleName: 'Zhi+Mang+Xing' },
   { id: 'kaiti', name: '楷体', glyph: '楷', stack: "'KaiTi', '楷体', 'STKaiti', serif", weight: 400, isWeb: false },
-  { id: 'song', name: '宋体粗', glyph: '宋', stack: "'STSong', '宋体', 'Source Han Serif SC', serif", weight: 700, isWeb: false },
-  { id: 'fang', name: '仿宋', glyph: '仿', stack: "'FangSong', '仿宋', 'STFangsong', serif", weight: 400, isWeb: false },
-  { id: 'lisu', name: '隶书', glyph: '隸', stack: "'LiSu', '隶书', 'STLiti', serif", weight: 400, isWeb: false },
-  { id: 'mono', name: '等宽粗', glyph: 'A', stack: "'JetBrains Mono', 'Courier New', monospace", weight: 700, isWeb: false },
-  { id: 'bit', name: '8-bit 英文', glyph: 'P', stack: "'Press Start 2P', monospace", weight: 400, isWeb: true, googleName: 'Press+Start+2P' },
-  { id: 'dotgothic', name: 'DotGothic16 像素', glyph: 'ピ', stack: "'DotGothic16', sans-serif", weight: 400, isWeb: true, googleName: 'DotGothic16' },
-  { id: 'silkscreen', name: 'Silkscreen 像素', glyph: 'S', stack: "'Silkscreen', monospace", weight: 700, isWeb: true, googleName: 'Silkscreen:wght@700' },
-  { id: 'pixelify', name: 'Pixelify Sans', glyph: 'X', stack: "'Pixelify Sans', sans-serif", weight: 700, isWeb: true, googleName: 'Pixelify+Sans:wght@700' },
+  { id: 'bit', name: 'Press Start 2P', glyph: 'P', stack: "'Press Start 2P', monospace", weight: 400, isWeb: true, googleName: 'Press+Start+2P', enOnly: true },
+  { id: 'silkscreen', name: 'Silkscreen', glyph: 'S', stack: "'Silkscreen', monospace", weight: 700, isWeb: true, googleName: 'Silkscreen:wght@700', enOnly: true },
+  { id: 'pixelify', name: 'Pixelify Sans', glyph: 'X', stack: "'Pixelify Sans', sans-serif", weight: 700, isWeb: true, googleName: 'Pixelify+Sans:wght@700', enOnly: true },
 ];
 
 const TS_SIZES = [
@@ -4308,8 +4316,15 @@ function tsBuildFontGrid() {
   wrap.dataset.built = '1';
   TS_FONTS.forEach(def => {
     const card = document.createElement('div');
-    card.className = 'ts-font-card' + (def.id === tsState.fontId ? ' active' : '');
+    card.className = 'ts-font-card' + (def.id === tsState.fontId ? ' active' : '') + (def.enOnly ? ' en-only' : '');
     card.dataset.fontId = def.id;
+    if (def.enOnly) {
+      const badge = document.createElement('span');
+      badge.className = 'ts-en-badge';
+      badge.textContent = 'EN';
+      badge.title = '英文/数字专用，不支持中文';
+      card.appendChild(badge);
+    }
     const glyph = document.createElement('div');
     glyph.className = 'ts-font-glyph';
     glyph.style.fontFamily = def.stack;
