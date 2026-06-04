@@ -1991,6 +1991,13 @@
         <div class="grp">
           <button class="ab-btn" id="btn-clear" data-tip="清空画布">🗑</button>
         </div>
+        <div class="sep"></div>
+        <div class="grp">
+          <button class="ab-btn" id="btn-pbg-save" data-tip="保存工程 (.pbg)">💾</button>
+          <button class="ab-btn" id="btn-pbg-load" data-tip="加载工程 (.pbg)">📂</button>
+          <button class="ab-btn" id="btn-png-export" data-tip="导出 PNG（1:1 直出）">🖼️</button>
+          <input type="file" id="pbg-file-input" accept=".pbg,application/json" hidden>
+        </div>
         <button class="ab-btn mobile-only" id="btn-show-panel" data-tip="调色板" style="margin-left:auto">🎨</button>
         <div class="ab-meta">
           <span>尺寸 <span class="v" id="m-size">29×29</span></span>
@@ -2372,6 +2379,9 @@ const state = {
   historyIdx: -1,
   brand: 'MARD',
   sourceAiRemove: true,
+  // Committed text-stamp records, kept alongside the rasterized grid so
+  // .pbg can preserve them as re-editable metadata (M1).
+  stamps: [],
 };
 
 function makeGrid(size) {
@@ -2400,12 +2410,15 @@ function saveDraft() {
     return;
   }
   try {
+    const now = Date.now();
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       v: 1,
-      ts: Date.now(),
+      ts: now,
+      updatedAt: new Date(now).toISOString(),
       brand: state.brand,
       size: state.size,
-      grid: state.grid
+      grid: state.grid,
+      stamps: Array.isArray(state.stamps) ? state.stamps : [],
     }));
     draftDirty = false;
   } catch (e) { console.warn('saveDraft failed', e); }
@@ -2439,6 +2452,7 @@ function applyDraft(d) {
   }
   state.size = d.size;
   state.grid = cloneGrid(d.grid);
+  state.stamps = Array.isArray(d.stamps) ? d.stamps.slice() : [];
   state.history = [cloneGrid(state.grid)];
   state.historyIdx = 0;
   syncEditorSizeUI();
@@ -2489,6 +2503,7 @@ function refreshActionBar() {
 function initGrid(size) {
   state.size = size;
   state.grid = makeGrid(size);
+  state.stamps = [];
   state.history = [cloneGrid(state.grid)];
   state.historyIdx = 0;
   document.getElementById('m-size').textContent = `${size}×${size}`;
@@ -4446,6 +4461,20 @@ function tsEndStamping(commit) {
   if (commit) {
     pushHistory();
     const { grid: sg, w, h, anchor } = state.stamping;
+    // Record the stamp BEFORE rasterizing so .pbg keeps it re-editable.
+    try {
+      const sgCopy = sg.map(row => row.slice());
+      state.stamps.push({
+        grid: sgCopy,
+        w, h,
+        anchor: { x: anchor.x, y: anchor.y },
+        ts: Date.now(),
+        text: state.stamping.text || tsState?.text || '',
+        fontId: state.stamping.fontId || tsState?.fontId || '',
+        mainColorId: state.stamping.mainColorId || tsState?.mainColorId || null,
+        strokeOn: !!(state.stamping.strokeOn ?? tsState?.strokeOn),
+      });
+    } catch (e) { /* non-fatal: stamps tracking is metadata only */ }
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const id = sg[y][x];
@@ -4826,6 +4855,335 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
   renderCanvas();
   showToast('已水平镜像 ↔️');
 });
+
+/* ============== .pbg Project File (M1) ==============
+   Schema v1:
+   {
+     v: 1,
+     palette: "MARD-291-v1",       // locked palette identifier
+     brand: "MARD",
+     size: 29,
+     pixels: "<base64 of uint16 LE, length = size*size>",
+                                   // 0 = empty, n>0 = palette index + 1
+     stamps: [{ grid, w, h, anchor:{x,y}, ts, text?, fontId?, mainColorId?, strokeOn? }, ...],
+     meta: {
+       title: "",
+       thumbnail: "data:image/png;base64,...",  // 128x128 PNG dataURL
+       updatedAt: "ISO 8601",
+       appVersion: "1.39"
+     }
+   }
+   migrate(v→v+1) is left as a stub channel for future schema evolution.
+*/
+const PBG_VERSION = 1;
+const PBG_PALETTE_ID = 'MARD-291-v1';
+const PBG_APP_VERSION = '1.39';
+// Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
+const PBG_PALETTE_INDEX = (() => {
+  const m = new Map();
+  MARD_RAW.forEach((c, i) => m.set(c.id, i));
+  return m;
+})();
+const PBG_PALETTE_BY_INDEX = MARD_RAW.map(c => c.id);
+
+function pbgPixelsToB64(grid, size) {
+  const buf = new ArrayBuffer(size * size * 2);
+  const view = new DataView(buf);
+  let p = 0;
+  for (let y = 0; y < size; y++) {
+    const row = grid[y];
+    for (let x = 0; x < size; x++) {
+      const id = row[x];
+      let v = 0;
+      if (id) {
+        const idx = PBG_PALETTE_INDEX.get(id);
+        v = (idx == null) ? 0 : (idx + 1);
+      }
+      view.setUint16(p, v, true); // little-endian for cross-platform stability
+      p += 2;
+    }
+  }
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(s);
+}
+function pbgB64ToGrid(b64, size) {
+  const bin = atob(b64);
+  const expected = size * size * 2;
+  if (bin.length !== expected) {
+    throw new Error(`pixels payload size mismatch (got ${bin.length}, expected ${expected})`);
+  }
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const view = new DataView(bytes.buffer);
+  const grid = makeGrid(size);
+  let p = 0;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const v = view.getUint16(p, true);
+      p += 2;
+      if (v === 0) { grid[y][x] = null; continue; }
+      const idx = v - 1;
+      const id = PBG_PALETTE_BY_INDEX[idx];
+      // Tolerate unknown indices (defensive — should never trigger for v1).
+      grid[y][x] = (id && PALETTE_BY_ID[id]) ? id : null;
+    }
+  }
+  return grid;
+}
+
+/* Render a 128x128 thumbnail of the current grid (flat squares, no axis/grid). */
+function pbgBuildThumbnail(grid, size, dim = 128) {
+  const off = document.createElement('canvas');
+  off.width = dim;
+  off.height = dim;
+  const c = off.getContext('2d');
+  c.imageSmoothingEnabled = false;
+  c.fillStyle = '#ffffff';
+  c.fillRect(0, 0, dim, dim);
+  const cell = dim / size;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const id = grid[y][x];
+      if (!id) continue;
+      const col = PALETTE_BY_ID[id];
+      if (!col) continue;
+      c.fillStyle = col.hex;
+      // Use ceil to avoid sub-pixel gaps between cells at non-integer cell sizes.
+      const x0 = Math.floor(x * cell);
+      const y0 = Math.floor(y * cell);
+      const x1 = Math.floor((x + 1) * cell);
+      const y1 = Math.floor((y + 1) * cell);
+      c.fillRect(x0, y0, x1 - x0, y1 - y0);
+    }
+  }
+  return off.toDataURL('image/png');
+}
+
+/* Render a clean 1:1 PNG of the current grid (no axis, no grid, no numbers). */
+function pbgBuildExportPng(grid, size, cellPx = 16) {
+  const off = document.createElement('canvas');
+  off.width = size * cellPx;
+  off.height = size * cellPx;
+  const c = off.getContext('2d');
+  c.imageSmoothingEnabled = false;
+  c.fillStyle = '#ffffff';
+  c.fillRect(0, 0, off.width, off.height);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const id = grid[y][x];
+      if (!id) continue;
+      const col = PALETTE_BY_ID[id];
+      if (!col) continue;
+      c.fillStyle = col.hex;
+      c.fillRect(x * cellPx, y * cellPx, cellPx, cellPx);
+    }
+  }
+  return off;
+}
+
+/* Future-proof migration channel. v1 is the current schema; older versions
+   can be added here as `if (obj.v === 0) { ...transform...; obj.v = 1; }`. */
+function pbgMigrate(obj) {
+  if (!obj || typeof obj !== 'object') throw new Error('invalid project file');
+  if (typeof obj.v !== 'number') throw new Error('missing schema version');
+  // No prior versions yet. When v2 arrives:
+  //   if (obj.v === 1) { /* ...transform v1 -> v2... */ obj.v = 2; }
+  if (obj.v > PBG_VERSION) {
+    throw new Error(`项目文件来自更高版本 (v${obj.v})，请升级工坊后重试`);
+  }
+  return obj;
+}
+
+function pbgSerialize() {
+  if (!state.grid) throw new Error('画板还没准备好');
+  const size = state.size;
+  return {
+    v: PBG_VERSION,
+    palette: PBG_PALETTE_ID,
+    brand: state.brand || 'MARD',
+    size,
+    pixels: pbgPixelsToB64(state.grid, size),
+    stamps: Array.isArray(state.stamps) ? state.stamps : [],
+    meta: {
+      title: '',
+      thumbnail: pbgBuildThumbnail(state.grid, size, 128),
+      updatedAt: new Date().toISOString(),
+      appVersion: PBG_APP_VERSION,
+    },
+  };
+}
+
+function pbgDeserialize(rawObj) {
+  const obj = pbgMigrate(rawObj);
+  if (obj.palette !== PBG_PALETTE_ID) {
+    throw new Error(`色卡不兼容：${obj.palette || '未知'}（仅支持 ${PBG_PALETTE_ID}）`);
+  }
+  const size = obj.size | 0;
+  if (!size || size < 8 || size > 256) throw new Error(`非法画板尺寸：${obj.size}`);
+  if (!obj.pixels || typeof obj.pixels !== 'string') throw new Error('缺少像素数据');
+  const grid = pbgB64ToGrid(obj.pixels, size);
+  const stamps = Array.isArray(obj.stamps) ? obj.stamps : [];
+  const brand = obj.brand && BRANDS[obj.brand] ? obj.brand : 'MARD';
+  const meta = obj.meta || {};
+  return { size, grid, stamps, brand, meta };
+}
+
+function pbgApply(parsed) {
+  // Apply parsed pbg payload into editor state. Mirrors applyDraft but for
+  // a fully-featured project file (preserves stamps + history reset).
+  if (parsed.brand && BRANDS[parsed.brand]) {
+    state.brand = parsed.brand;
+    PALETTE = buildPaletteFromRaw(BRANDS[parsed.brand].colors);
+    buildColorIndex();
+    document.querySelectorAll('.brand-tag').forEach(b => {
+      b.classList.toggle('active', b.dataset.brand === parsed.brand);
+    });
+  }
+  state.size = parsed.size;
+  state.grid = cloneGrid(parsed.grid);
+  state.stamps = parsed.stamps.slice();
+  state.history = [cloneGrid(state.grid)];
+  state.historyIdx = 0;
+  syncEditorSizeUI();
+  setCanvasSize();
+  renderCanvas();
+  renderPalette();
+  renderMaterials();
+  refreshActionBar();
+  switchView('editor');
+  fitCanvas();
+  // After applying, persist a fresh draft so the loaded project is the baseline.
+  scheduleDraftSave();
+}
+
+function pbgDownload(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function pbgFilenameStamp() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+
+function pbgSaveProject() {
+  if (!state.grid || isGridEmpty(state.grid)) {
+    showToast('画板是空的，没什么可保存的', 'warn');
+    return;
+  }
+  try {
+    const obj = pbgSerialize();
+    const json = JSON.stringify(obj);
+    const blob = new Blob([json], { type: 'application/json' });
+    pbgDownload(`pixelbead-${pbgFilenameStamp()}.pbg`, blob);
+    showToast('已保存 .pbg 工程文件 💾');
+    // Sync localStorage updatedAt to match the just-saved file so a stale
+    // draft prompt won't fire on the next reload.
+    saveDraft();
+  } catch (e) {
+    console.error('pbgSave failed', e);
+    showToast('保存失败：' + (e.message || e), 'error');
+  }
+}
+
+function pbgExportPng() {
+  if (!state.grid || isGridEmpty(state.grid)) {
+    showToast('画板是空的，没什么可导出', 'warn');
+    return;
+  }
+  const off = pbgBuildExportPng(state.grid, state.size, 16);
+  off.toBlob((blob) => {
+    if (!blob) { showToast('PNG 导出失败', 'error'); return; }
+    pbgDownload(`pixelbead-${pbgFilenameStamp()}.png`, blob);
+    showToast('已导出 PNG 🖼️');
+  }, 'image/png');
+}
+
+function pbgConfirmLoad(parsed) {
+  // Check if the in-memory localStorage draft is newer than the file. If yes,
+  // ask the user whether to keep editing the draft or overwrite with the file.
+  const draft = loadDraft();
+  const fileUpdatedAt = parsed.meta && parsed.meta.updatedAt
+    ? Date.parse(parsed.meta.updatedAt) : NaN;
+  const draftUpdatedAt = draft && draft.updatedAt
+    ? Date.parse(draft.updatedAt)
+    : (draft && draft.ts ? draft.ts : NaN);
+  // Only prompt if both timestamps are valid, the draft is clearly newer
+  // than the file, and the draft isn't already empty.
+  if (Number.isFinite(fileUpdatedAt) && Number.isFinite(draftUpdatedAt) &&
+      draftUpdatedAt > fileUpdatedAt && draft && !isGridEmpty(draft.grid)) {
+    const ok = confirm(
+      '本地草稿比该 .pbg 文件更新。\n\n' +
+      '点「确定」加载文件 (覆盖未保存的草稿)\n' +
+      '点「取消」保留正在编辑的草稿'
+    );
+    if (!ok) {
+      showToast('已取消加载，保留当前草稿', 'info');
+      return false;
+    }
+  }
+  return true;
+}
+
+function pbgReadFile(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(fr.error || new Error('读取文件失败'));
+    fr.onload = () => resolve(String(fr.result || ''));
+    fr.readAsText(file);
+  });
+}
+
+async function pbgLoadFromFile(file) {
+  try {
+    const text = await pbgReadFile(file);
+    let raw;
+    try { raw = JSON.parse(text); }
+    catch (e) { throw new Error('文件不是合法的 .pbg JSON'); }
+    const parsed = pbgDeserialize(raw);
+    if (!pbgConfirmLoad(parsed)) return;
+    pbgApply(parsed);
+    showToast(`已加载工程：${file.name} 📂`);
+  } catch (e) {
+    console.error('pbgLoad failed', e);
+    showToast('加载失败：' + (e.message || e), 'error');
+  }
+}
+
+(function wirePbgButtons() {
+  const btnSave = document.getElementById('btn-pbg-save');
+  const btnLoad = document.getElementById('btn-pbg-load');
+  const btnPng = document.getElementById('btn-png-export');
+  const fileInput = document.getElementById('pbg-file-input');
+  if (btnSave) btnSave.addEventListener('click', pbgSaveProject);
+  if (btnPng) btnPng.addEventListener('click', pbgExportPng);
+  if (btnLoad && fileInput) {
+    btnLoad.addEventListener('click', () => {
+      fileInput.value = '';
+      fileInput.click();
+    });
+    fileInput.addEventListener('change', () => {
+      const f = fileInput.files && fileInput.files[0];
+      if (f) pbgLoadFromFile(f);
+    });
+  }
+  // Expose for console debugging / future scripts. Cheap and safe.
+  window.pbg = { serialize: pbgSerialize, deserialize: pbgDeserialize,
+    migrate: pbgMigrate, save: pbgSaveProject, exportPng: pbgExportPng,
+    VERSION: PBG_VERSION, PALETTE_ID: PBG_PALETTE_ID };
+})();
 
 /* ============== Canvas Rendering ============== */
 const CELL_PX = 24;  // logical bead size in canvas pixels
