@@ -1973,7 +1973,7 @@
         <div class="sep"></div>
         <div class="grp">
           <button class="ab-btn" id="btn-undo" data-tip="撤销 (Ctrl+Z)" disabled>↩︎</button>
-          <button class="ab-btn" id="btn-redo" data-tip="重做 (Ctrl+Shift+Z)" disabled>↪︎</button>
+          <button class="ab-btn" id="btn-redo" data-tip="重做 (Ctrl+Y / Ctrl+Shift+Z)" disabled>↪︎</button>
         </div>
         <div class="sep"></div>
         <div class="grp brush-size-grp" id="brush-size-grp" hidden>
@@ -2453,7 +2453,7 @@ function applyDraft(d) {
   state.size = d.size;
   state.grid = cloneGrid(d.grid);
   state.stamps = Array.isArray(d.stamps) ? d.stamps.slice() : [];
-  state.history = [cloneGrid(state.grid)];
+  state.history = [historySnapshot()];
   state.historyIdx = 0;
   syncEditorSizeUI();
   setCanvasSize();
@@ -2473,10 +2473,39 @@ window.addEventListener('beforeunload', (e) => {
   }
 });
 
+/* History stack (M2): snapshot covers BOTH grid + stamps so that
+   text-stamp commits and other stamp-aware operations are undoable.
+   Stack depth capped at HISTORY_LIMIT; lightweight (no thumbnail). */
+const HISTORY_LIMIT = 50;
+function cloneStamps(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map(s => ({
+    grid: Array.isArray(s.grid) ? s.grid.map(row => row.slice()) : [],
+    w: s.w | 0,
+    h: s.h | 0,
+    anchor: { x: s.anchor?.x | 0, y: s.anchor?.y | 0 },
+    ts: s.ts || 0,
+    text: s.text || '',
+    fontId: s.fontId || '',
+    mainColorId: s.mainColorId || null,
+    strokeOn: !!s.strokeOn,
+  }));
+}
+function historySnapshot() {
+  return {
+    grid: cloneGrid(state.grid),
+    stamps: cloneStamps(state.stamps),
+  };
+}
+function applyHistorySnapshot(snap) {
+  if (!snap || !snap.grid) return;
+  state.grid = cloneGrid(snap.grid);
+  state.stamps = cloneStamps(snap.stamps);
+}
 function pushHistory() {
   state.history = state.history.slice(0, state.historyIdx + 1);
-  state.history.push(cloneGrid(state.grid));
-  if (state.history.length > 50) state.history.shift();
+  state.history.push(historySnapshot());
+  if (state.history.length > HISTORY_LIMIT) state.history.shift();
   state.historyIdx = state.history.length - 1;
   refreshActionBar();
   scheduleDraftSave();
@@ -2484,14 +2513,14 @@ function pushHistory() {
 function undo() {
   if (state.historyIdx <= 0) return;
   state.historyIdx--;
-  state.grid = cloneGrid(state.history[state.historyIdx]);
+  applyHistorySnapshot(state.history[state.historyIdx]);
   renderCanvas(); renderMaterials(); renderPalette(); refreshActionBar();
   scheduleDraftSave();
 }
 function redo() {
   if (state.historyIdx >= state.history.length - 1) return;
   state.historyIdx++;
-  state.grid = cloneGrid(state.history[state.historyIdx]);
+  applyHistorySnapshot(state.history[state.historyIdx]);
   renderCanvas(); renderMaterials(); renderPalette(); refreshActionBar();
   scheduleDraftSave();
 }
@@ -2504,7 +2533,7 @@ function initGrid(size) {
   state.size = size;
   state.grid = makeGrid(size);
   state.stamps = [];
-  state.history = [cloneGrid(state.grid)];
+  state.history = [historySnapshot()];
   state.historyIdx = 0;
   document.getElementById('m-size').textContent = `${size}×${size}`;
   fitCanvas();
@@ -2567,7 +2596,8 @@ async function changeEditorSize(newSize) {
       }
       state.size = newSize;
       state.grid = grid;
-      state.history = [cloneGrid(grid)];
+      state.stamps = [];
+      state.history = [historySnapshot()];
       state.historyIdx = 0;
       document.getElementById('m-size').textContent = `${newSize}×${newSize}`;
       if (heavy) await yieldFrame();
@@ -3620,7 +3650,8 @@ function captureEditorSnapshot() {
   return {
     size: state.size,
     grid: cloneGrid(state.grid),
-    history: state.history.map(cloneGrid),
+    stamps: cloneStamps(state.stamps),
+    history: state.history.map(s => ({ grid: cloneGrid(s.grid), stamps: cloneStamps(s.stamps) })),
     historyIdx: state.historyIdx,
     sourceImage: state.sourceImage,
     sourceMode: state.sourceMode,
@@ -3633,7 +3664,8 @@ function restoreEditorSnapshot(snap) {
   if (!snap) return;
   state.size = snap.size;
   state.grid = cloneGrid(snap.grid);
-  state.history = snap.history.map(cloneGrid);
+  state.stamps = cloneStamps(snap.stamps);
+  state.history = (snap.history || []).map(s => ({ grid: cloneGrid(s.grid), stamps: cloneStamps(s.stamps) }));
   state.historyIdx = snap.historyIdx;
   state.sourceImage = snap.sourceImage;
   state.sourceMode = snap.sourceMode;
@@ -3964,7 +3996,8 @@ function pickStyle(mode) {
   const grid = pendingResults[mode];
   initGrid(pendingSize);
   state.grid = grid;
-  state.history = [cloneGrid(grid)];
+  state.stamps = [];
+  state.history = [historySnapshot()];
   state.historyIdx = 0;
   // Remember source so editor's size selector can re-pixelate
   state.sourceImage = pendingAiRemove ? null : pendingImg;
@@ -4459,7 +4492,6 @@ function tsStartStamping(stamp) {
 function tsEndStamping(commit) {
   if (!state.stamping) return;
   if (commit) {
-    pushHistory();
     const { grid: sg, w, h, anchor } = state.stamping;
     // Record the stamp BEFORE rasterizing so .pbg keeps it re-editable.
     try {
@@ -4485,7 +4517,9 @@ function tsEndStamping(commit) {
         }
       }
     }
-    refreshActionBar?.();
+    // Snapshot AFTER rasterize + stamp record so undo restores pre-stamp state
+    // (post-state model, consistent with fillBucket / brush stroke / flip).
+    pushHistory();
     renderMaterials?.();
     renderPalette?.();
     renderCanvas();
@@ -4870,14 +4904,14 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
        title: "",
        thumbnail: "data:image/png;base64,...",  // 128x128 PNG dataURL
        updatedAt: "ISO 8601",
-       appVersion: "1.39"
+       appVersion: "1.40"
      }
    }
    migrate(v→v+1) is left as a stub channel for future schema evolution.
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.39';
+const PBG_APP_VERSION = '1.40';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
@@ -5047,7 +5081,7 @@ function pbgApply(parsed) {
   state.size = parsed.size;
   state.grid = cloneGrid(parsed.grid);
   state.stamps = parsed.stamps.slice();
-  state.history = [cloneGrid(state.grid)];
+  state.history = [historySnapshot()];
   state.historyIdx = 0;
   syncEditorSizeUI();
   setCanvasSize();
