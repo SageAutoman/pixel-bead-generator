@@ -2014,6 +2014,9 @@
       <button class="tool" data-tool="fill" data-tip="油漆桶 (G)" data-tip-side="right">🪣</button>
       <button class="tool" data-tool="picker" data-tip="取色器 (I)" data-tip-side="right">💉</button>
       <div class="tool-divider"></div>
+      <button class="tool" data-tool="select-rect" data-tip="矩形选区 (M)" data-tip-side="right">⬚</button>
+      <button class="tool" data-tool="select-wand" data-tip="魔棒选区 (W)" data-tip-side="right">🪄</button>
+      <div class="tool-divider"></div>
       <button class="tool" data-tool="pan" data-tip="平移 (H/空格)" data-tip-side="right">🖐️</button>
       <button class="tool tool-zoom" data-act="zoom-in" data-tip="放大 (+)" data-tip-side="right">🔍<span class="zsign">+</span></button>
       <button class="tool tool-zoom" data-act="zoom-out" data-tip="缩小 (−)" data-tip-side="right">🔍<span class="zsign">−</span></button>
@@ -2045,6 +2048,13 @@
         <div class="grp">
           <button class="ab-btn" id="btn-flip-h" data-tip="左右镜像（水平翻转）">↔️</button>
           <button class="ab-btn" id="btn-textstamp" data-tip="艺术字（中英文印章）">🅰️</button>
+        </div>
+        <div class="sep"></div>
+        <div class="grp sel-grp" id="sel-grp" hidden>
+          <span class="layer-label">选区</span>
+          <button class="ab-btn" id="btn-sel-copy" data-tip="复制选区">⧉</button>
+          <button class="ab-btn" id="btn-sel-fliph" data-tip="选区水平翻转">↔</button>
+          <button class="ab-btn" id="btn-sel-flipv" data-tip="选区垂直翻转">↕</button>
         </div>
         <div class="sep"></div>
         <div class="grp">
@@ -2467,6 +2477,15 @@ const state = {
     { id: 'stamps', name: '印章', visible: true },
   ],
   activeLayerId: 'bg',  // 'bg' | 'stamps'
+  // M4 (v1.42): selection tool state (transient — NOT serialized to .pbg).
+  //   active   — a selection currently exists
+  //   cells    — Set of "row,col" grid keys (selected bg cells)
+  //   bbox     — {minR,minC,maxR,maxC} bounding box of cells
+  //   floating — null, or a lifted buffer being moved/copied:
+  //              { grid:[h][w] of id|null, w, h, baseR, baseC, keepOrigin }
+  // Selection only ever touches the bg layer (state.grid). Stamps layer is
+  // out of scope (reuses the M3 guard pattern).
+  selection: { active: false, cells: new Set(), bbox: null, floating: null },
 };
 function getLayer(id) { return state.layers.find(l => l.id === id) || null; }
 function isLayerVisible(id) { return !!getLayer(id)?.visible; }
@@ -2498,6 +2517,7 @@ function isProjectEmpty() {
   return true;
 }
 function saveDraft() {
+  if (state.selection?.floating) return;  // M4: don't persist a half-lifted state; commit fires its own save
   if (isProjectEmpty()) {
     // Empty project: clear stale draft instead of overwriting with blank.
     try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
@@ -2551,6 +2571,7 @@ function applyDraft(d) {
   // M3: reset layer state on draft restore (visibility on, bg active).
   state.layers.forEach(l => { l.visible = true; });
   state.activeLayerId = 'bg';
+  clearSelection?.();  // M4: reset transient selection
   state.history = [historySnapshot()];
   state.historyIdx = 0;
   syncEditorSizeUI();
@@ -2622,6 +2643,7 @@ function pushHistory() {
 }
 function undo() {
   if (state.historyIdx <= 0) return;
+  if (state.selection?.active) clearSelection();  // M4: drop transient selection
   state.historyIdx--;
   applyHistorySnapshot(state.history[state.historyIdx]);
   renderCanvas(); renderMaterials(); renderPalette(); refreshActionBar();
@@ -2629,6 +2651,7 @@ function undo() {
 }
 function redo() {
   if (state.historyIdx >= state.history.length - 1) return;
+  if (state.selection?.active) clearSelection();  // M4: drop transient selection
   state.historyIdx++;
   applyHistorySnapshot(state.history[state.historyIdx]);
   renderCanvas(); renderMaterials(); renderPalette(); refreshActionBar();
@@ -2646,6 +2669,7 @@ function initGrid(size) {
   // M3: reset layer state on full init (visibility on, bg active).
   state.layers.forEach(l => { l.visible = true; });
   state.activeLayerId = 'bg';
+  clearSelection?.();  // M4: reset transient selection
   state.history = [historySnapshot()];
   state.historyIdx = 0;
   document.getElementById('m-size').textContent = `${size}×${size}`;
@@ -4875,10 +4899,7 @@ document.querySelectorAll('.tool').forEach(t => {
     const tool = t.dataset.tool;
     const act = t.dataset.act;
     if (tool) {
-      state.tool = tool;
-      document.querySelectorAll('.tool[data-tool]').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      updateCursor();
+      setTool(tool);
     } else if (act === 'zoom-in') zoom(1.25);
     else if (act === 'zoom-out') zoom(0.8);
     else if (act === 'fit') fitCanvas();
@@ -4955,6 +4976,210 @@ document.querySelectorAll('#layer-grp .layer-pill').forEach(pill => {
     }
     setActiveLayer(id);
   });
+});
+
+/* ============== Selection tool (M4, v1.42) ==============
+   Rectangle marquee + magic-wand (flood) selection on the bg layer, with
+   move / copy / horizontal-flip / vertical-flip on the selected region.
+
+   Design (see memory/2026-06-06.md):
+   - Selection is transient state on state.selection; it is NOT serialized to
+     .pbg (any pending floating buffer is auto-committed before save).
+   - A "floating" buffer is lifted pixels in flight. Move lifts + clears the
+     origin; copy lifts + keeps the origin. Drag repositions; commit pastes
+     the buffer into the grid and pushes ONE history point. Cancel restores.
+   - Selection touches the bg layer only. When the stamps layer is active, or
+     the bg layer is hidden, the selection tools are blocked with a toast
+     (reuses the M3 guard pattern).
+   - History contract: a bare selection (no commit) does NOT enter history.
+     Only a committed move/copy and an in-place flip push a snapshot — one
+     action == one stack point. */
+const SELECT_TOOLS = new Set(['select-rect', 'select-wand']);
+function isSelectTool(t) { return SELECT_TOOLS.has(t || state.tool); }
+
+// Transient marquee preview during a rect drag (grid coords); null when idle.
+let selMarquee = null;
+
+function selectionAllowedOrHint() {
+  const now = Date.now();
+  const fire = (msg) => {
+    if (now - _paintBlockToastTs > 1500) {
+      _paintBlockToastTs = now;
+      try { showToast(msg, 'warn'); } catch (_) {}
+    }
+  };
+  if (isStampsActive()) { fire('选区只作用于背景层，请选中“背景”层'); return false; }
+  if (!isLayerVisible('bg')) { fire('背景层已隐藏，请先显示再选区'); return false; }
+  return true;
+}
+
+function selBbox(cells) {
+  let minR = Infinity, minC = Infinity, maxR = -Infinity, maxC = -Infinity;
+  for (const k of cells) {
+    const i = k.indexOf(',');
+    const r = +k.slice(0, i), c = +k.slice(i + 1);
+    if (r < minR) minR = r; if (r > maxR) maxR = r;
+    if (c < minC) minC = c; if (c > maxC) maxC = c;
+  }
+  if (!isFinite(minR)) return null;
+  return { minR, minC, maxR, maxC };
+}
+
+function clearSelection() {
+  state.selection = { active: false, cells: new Set(), bbox: null, floating: null };
+  selMarquee = null;
+}
+
+function setSelection(cells) {
+  if (!cells || cells.size === 0) { clearSelection(); return; }
+  state.selection = { active: true, cells, bbox: selBbox(cells), floating: null };
+}
+
+function rectSelect(r0, c0, r1, c1) {
+  const minR = Math.max(0, Math.min(r0, r1)), maxR = Math.min(state.size - 1, Math.max(r0, r1));
+  const minC = Math.max(0, Math.min(c0, c1)), maxC = Math.min(state.size - 1, Math.max(c0, c1));
+  const cells = new Set();
+  for (let r = minR; r <= maxR; r++) for (let c = minC; c <= maxC; c++) cells.add(r + ',' + c);
+  setSelection(cells);
+}
+
+/* Magic wand: 4-connected flood of cells sharing grid[r][c]'s value (the
+   target value may be null, so you can select a connected empty region). */
+function magicWandSelect(r, c) {
+  if (r < 0 || c < 0 || r >= state.size || c >= state.size) return;
+  const target = state.grid[r][c];
+  const cells = new Set();
+  const seen = new Set();
+  const stack = [[r, c]];
+  while (stack.length) {
+    const [cr, cc] = stack.pop();
+    if (cr < 0 || cc < 0 || cr >= state.size || cc >= state.size) continue;
+    const key = cr + ',' + cc;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (state.grid[cr][cc] !== target) continue;
+    cells.add(key);
+    stack.push([cr + 1, cc], [cr - 1, cc], [cr, cc + 1], [cr, cc - 1]);
+  }
+  setSelection(cells);
+}
+
+/* Lift the selected cells into a floating buffer. keepOrigin=false (move)
+   clears the source cells; keepOrigin=true (copy) leaves them in place.
+   Does NOT push history — the lift is part of an in-flight gesture. */
+function liftFloating(keepOrigin) {
+  const sel = state.selection;
+  if (!sel || !sel.active || sel.floating) return false;
+  const bb = sel.bbox;
+  if (!bb) return false;
+  const h = bb.maxR - bb.minR + 1, w = bb.maxC - bb.minC + 1;
+  const fg = Array.from({ length: h }, () => Array(w).fill(null));
+  for (const k of sel.cells) {
+    const i = k.indexOf(',');
+    const r = +k.slice(0, i), c = +k.slice(i + 1);
+    fg[r - bb.minR][c - bb.minC] = state.grid[r][c];
+    if (!keepOrigin) state.grid[r][c] = null;
+  }
+  sel.floating = { grid: fg, w, h, baseR: bb.minR, baseC: bb.minC, keepOrigin: !!keepOrigin };
+  return true;
+}
+
+/* Reposition the floating buffer, clamped to stay fully on the grid. */
+function moveFloatingTo(baseR, baseC) {
+  const f = state.selection && state.selection.floating;
+  if (!f) return;
+  f.baseR = Math.max(0, Math.min(state.size - f.h, baseR));
+  f.baseC = Math.max(0, Math.min(state.size - f.w, baseC));
+}
+
+/* Paste the floating buffer into the grid at its current position and push
+   ONE history point. Selection becomes the pasted region. */
+function commitFloating() {
+  const sel = state.selection;
+  const f = sel && sel.floating;
+  if (!f) return false;
+  for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) {
+    const id = f.grid[y][x];
+    if (!id) continue;
+    const gy = f.baseR + y, gx = f.baseC + x;
+    if (gy < 0 || gx < 0 || gy >= state.size || gx >= state.size) continue;
+    state.grid[gy][gx] = id;
+  }
+  const cells = new Set();
+  for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) {
+    if (f.grid[y][x]) cells.add((f.baseR + y) + ',' + (f.baseC + x));
+  }
+  sel.floating = null;
+  pushHistory();
+  setSelection(cells);
+  return true;
+}
+
+/* Discard the floating buffer without pasting. For a move (origin cleared),
+   restore the grid from the last committed snapshot; for a copy it's a
+   no-op on the grid. */
+function cancelFloating() {
+  const sel = state.selection;
+  const f = sel && sel.floating;
+  if (!f) return;
+  if (!f.keepOrigin && state.history[state.historyIdx]) {
+    applyHistorySnapshot(state.history[state.historyIdx]);
+  }
+  sel.floating = null;
+}
+
+/* Flip the live selection. When a floating buffer exists, flip the buffer in
+   place (committed later on drop). Otherwise flip the bbox rectangle's grid
+   pixels in place and push one history point. axis: 'h' | 'v'. */
+function flipSelection(axis) {
+  const sel = state.selection;
+  if (!sel || !sel.active) return false;
+  if (sel.floating) {
+    const f = sel.floating;
+    if (axis === 'h') f.grid.forEach(row => row.reverse());
+    else f.grid.reverse();
+    return true;
+  }
+  const bb = sel.bbox;
+  if (!bb) return false;
+  const h = bb.maxR - bb.minR + 1, w = bb.maxC - bb.minC + 1;
+  const buf = Array.from({ length: h }, (_, y) =>
+    Array.from({ length: w }, (_, x) => state.grid[bb.minR + y][bb.minC + x]));
+  if (axis === 'h') buf.forEach(row => row.reverse());
+  else buf.reverse();
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    state.grid[bb.minR + y][bb.minC + x] = buf[y][x];
+  }
+  pushHistory();
+  return true;
+}
+
+function copySelection() {
+  if (!selectionAllowedOrHint()) return;
+  const sel = state.selection;
+  if (!sel || !sel.active) { try { showToast('先框选一个区域', 'info'); } catch (_) {} return; }
+  if (sel.floating) commitFloating();
+  if (!liftFloating(true)) return;
+  const f = state.selection.floating;
+  moveFloatingTo(f.baseR + 1, f.baseC + 1);  // nudge so the copy is visible
+  renderCanvas();
+  try { showToast('已复制：拖动副本放置，回车/点空白处落定', 'info'); } catch (_) {}
+}
+
+/* Show the selection-ops button group only while a selection exists. */
+function refreshSelGroup() {
+  const g = document.getElementById('sel-grp');
+  if (g) g.hidden = !(state.selection && state.selection.active);
+}
+
+document.getElementById('btn-sel-copy')?.addEventListener('click', copySelection);
+document.getElementById('btn-sel-fliph')?.addEventListener('click', () => {
+  if (!selectionAllowedOrHint()) return;
+  if (flipSelection('h')) { renderCanvas(); renderMaterials(); renderPalette(); }
+});
+document.getElementById('btn-sel-flipv')?.addEventListener('click', () => {
+  if (!selectionAllowedOrHint()) return;
+  if (flipSelection('v')) { renderCanvas(); renderMaterials(); renderPalette(); }
 });
 
 /* Bead style picker */
@@ -5118,7 +5343,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.41';
+const PBG_APP_VERSION = '1.42';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
@@ -5368,6 +5593,7 @@ function pbgApply(parsed) {
   // M3: reset layer state on load (visibility on, bg active).
   state.layers.forEach(l => { l.visible = true; });
   state.activeLayerId = 'bg';
+  clearSelection?.();  // M4: reset transient selection
   state.history = [historySnapshot()];
   state.historyIdx = 0;
   syncEditorSizeUI();
@@ -5402,6 +5628,7 @@ function pbgFilenameStamp() {
 }
 
 function pbgSaveProject() {
+  if (state.selection?.floating) commitFloating();  // M4: settle before serialize
   if (isProjectEmpty()) {
     showToast('画板是空的，没什么可保存的', 'warn');
     return;
@@ -5422,6 +5649,7 @@ function pbgSaveProject() {
 }
 
 function pbgExportPng() {
+  if (state.selection?.floating) commitFloating();  // M4: settle before export
   if (isProjectEmpty()) {
     showToast('画板是空的，没什么可导出', 'warn');
     return;
@@ -5662,9 +5890,12 @@ function renderCanvas() {
   }
   // 毛巾烫: global parchment/towel weave overlay across all colored cells
   if (state.beadStyle === 'fluffy') drawFluffyOverlay(ctx, W, H, px, AXIS_PX);
+  // M4: selection marquee / floating buffer / selected-cell shading.
+  drawSelectionOverlay(px);
   // Axis labels last so they sit on top
   drawAxisLabels(ctx, state.size, px, W, H);
   applyTransform();
+  refreshSelGroup();
 }
 
 /* Global towel/parchment weave overlay — drawn once over the whole bead area
@@ -5690,6 +5921,54 @@ function drawFluffyOverlay(c, w, h, px, axisOffset) {
     c.fillRect(x, ax, 1, h - ax);
   }
   c.restore();
+}
+
+/* M4: draw the selection overlay — marquee preview, floating buffer beads,
+   and committed-selection shading + dashed bbox. Called from renderCanvas
+   just before the axis labels so it sits above the beads. */
+function strokeCellRect(minR, minC, maxR, maxC, px) {
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#2b6cff';
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(AXIS_PX + minC * px + 0.5, AXIS_PX + minR * px + 0.5,
+                 (maxC - minC + 1) * px - 1, (maxR - minR + 1) * px - 1);
+  ctx.restore();
+}
+function drawSelectionOverlay(px) {
+  // Live marquee preview during a rect drag.
+  if (selMarquee) {
+    const { r0, c0, r1, c1 } = selMarquee;
+    strokeCellRect(Math.min(r0, r1), Math.min(c0, c1), Math.max(r0, r1), Math.max(c0, c1), px);
+  }
+  const sel = state.selection;
+  if (!sel || !sel.active) return;
+  const f = sel.floating;
+  if (f) {
+    // Floating buffer: draw its beads at the current base position + outline.
+    for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) {
+      const id = f.grid[y][x];
+      if (!id) continue;
+      const c = PALETTE_BY_ID[id];
+      if (!c) continue;
+      const gx = f.baseC + x, gy = f.baseR + y;
+      if (gx < 0 || gy < 0 || gx >= state.size || gy >= state.size) continue;
+      const cx = AXIS_PX + gx * px + px / 2, cy = AXIS_PX + gy * px + px / 2;
+      drawBead(ctx, cx, cy, px, c.hex, state.beadStyle, (gy * state.size + gx) * 1009 + 17);
+    }
+    strokeCellRect(f.baseR, f.baseC, f.baseR + f.h - 1, f.baseC + f.w - 1, px);
+    return;
+  }
+  // Committed selection: shade selected cells + dashed bbox.
+  ctx.save();
+  ctx.fillStyle = 'rgba(43,108,255,0.20)';
+  for (const k of sel.cells) {
+    const i = k.indexOf(',');
+    const r = +k.slice(0, i), c = +k.slice(i + 1);
+    ctx.fillRect(AXIS_PX + c * px, AXIS_PX + r * px, px, px);
+  }
+  ctx.restore();
+  if (sel.bbox) strokeCellRect(sel.bbox.minR, sel.bbox.minC, sel.bbox.maxR, sel.bbox.maxC, px);
 }
 
 /* Deterministic PRNG (mulberry32) for stable glitter/fluffy rendering */
@@ -5885,6 +6164,8 @@ const TOOL_CURSORS = {
   fill:   buildEmojiCursor('🪣', 5, 20),
   picker: buildEmojiCursor('💉', 5, 20),
   pan:    'grab',
+  'select-rect': 'crosshair',
+  'select-wand': 'crosshair',
 };
 function updateCursor() {
   canvas.style.cursor = TOOL_CURSORS[state.tool] || 'crosshair';
@@ -5989,6 +6270,46 @@ wrap.addEventListener('pointerdown', (e) => {
     canvas.style.cursor = 'grabbing';
     return;
   }
+  // M4: selection tools (rectangle marquee / magic wand) + move/copy drag.
+  if (isSelectTool()) {
+    if (!selectionAllowedOrHint()) return;
+    const selCell = pointerToCell(e);
+    if (!selCell) return;
+    const [sx, sy] = selCell;            // sx = col, sy = row
+    const sel = state.selection;
+    // (a) A floating buffer is in flight: drag it if the click lands on a
+    //     filled floating pixel, otherwise commit it and start fresh.
+    if (sel.floating) {
+      const f = sel.floating;
+      const inFloat = sy >= f.baseR && sy < f.baseR + f.h &&
+                      sx >= f.baseC && sx < f.baseC + f.w &&
+                      f.grid[sy - f.baseR][sx - f.baseC];
+      if (inFloat) {
+        pointerState = { mode: 'float-drag', startX: sx, startY: sy, baseR0: f.baseR, baseC0: f.baseC };
+        return;
+      }
+      commitFloating();
+      // fall through to begin a new selection
+    }
+    // (b) Click inside an existing committed selection → lift & move it.
+    if (state.selection.active && state.selection.cells.has(sy + ',' + sx)) {
+      liftFloating(false);
+      const f = state.selection.floating;
+      pointerState = { mode: 'float-drag', startX: sx, startY: sy, baseR0: f.baseR, baseC0: f.baseC };
+      renderCanvas();
+      return;
+    }
+    // (c) New selection.
+    if (state.tool === 'select-wand') {
+      magicWandSelect(sy, sx);
+      renderCanvas();
+      return;
+    }
+    pointerState = { mode: 'marquee', r0: sy, c0: sx, r1: sy, c1: sx };
+    selMarquee = { r0: sy, c0: sx, r1: sy, c1: sx };
+    renderCanvas();
+    return;
+  }
   const cell = pointerToCell(e);
   if (!cell) return;
   const [x, y] = cell;
@@ -6017,6 +6338,25 @@ wrap.addEventListener('pointermove', (e) => {
     applyTransform();
     return;
   }
+  // M4: marquee drag (live rectangle preview) / floating buffer drag.
+  if (pointerState?.mode === 'marquee') {
+    const c = pointerToCell(e);
+    if (c) {
+      pointerState.r1 = c[1]; pointerState.c1 = c[0];
+      selMarquee = { r0: pointerState.r0, c0: pointerState.c0, r1: c[1], c1: c[0] };
+      renderCanvas();
+    }
+    return;
+  }
+  if (pointerState?.mode === 'float-drag') {
+    const c = pointerToCell(e);
+    if (c) {
+      const dr = c[1] - pointerState.startY, dc = c[0] - pointerState.startX;
+      moveFloatingTo(pointerState.baseR0 + dr, pointerState.baseC0 + dc);
+      renderCanvas();
+    }
+    return;
+  }
   const cell = pointerToCell(e);
   if (cell) {
     const [x, y] = cell;
@@ -6041,6 +6381,22 @@ wrap.addEventListener('pointermove', (e) => {
 });
 wrap.addEventListener('pointerup', (e) => {
   try { wrap.releasePointerCapture(e.pointerId); } catch(_) {}
+  // M4: finalize a marquee selection or settle a floating drag.
+  if (pointerState?.mode === 'marquee') {
+    const sameCell = pointerState.r0 === pointerState.r1 && pointerState.c0 === pointerState.c1;
+    // A bare single-cell click (no drag) deselects — matches "点选区外取消".
+    if (sameCell) clearSelection();
+    else rectSelect(pointerState.r0, pointerState.c0, pointerState.r1, pointerState.c1);
+    selMarquee = null;
+    pointerState = null;
+    renderCanvas();
+    return;
+  }
+  if (pointerState?.mode === 'float-drag') {
+    pointerState = null;
+    renderCanvas();   // leave floating in place; flips/commit happen later
+    return;
+  }
   if (pointerState?.mode === 'paint' && pointerState.changed) {
     pushHistory();
     renderMaterials();
@@ -6082,6 +6438,17 @@ wrap.addEventListener('wheel', (e) => {
 /* Keyboard shortcuts */
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'Escape' || e.key === 'Esc') {
+    // M4: ESC cancels a floating buffer, else clears the selection.
+    if (state.selection?.floating) { cancelFloating(); renderCanvas(); renderMaterials(); renderPalette(); return; }
+    if (state.selection?.active) { clearSelection(); renderCanvas(); return; }
+    return;
+  }
+  if (e.key === 'Enter') {
+    // M4: Enter settles a floating buffer.
+    if (state.selection?.floating) { commitFloating(); renderCanvas(); renderMaterials(); renderPalette(); }
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
   else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) { e.preventDefault(); redo(); }
   else if (e.key === 'b') setTool('brush');
@@ -6089,6 +6456,8 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'g') setTool('fill');
   else if (e.key === 'i') setTool('picker');
   else if (e.key === 'h') setTool('pan');
+  else if (e.key === 'm') setTool('select-rect');
+  else if (e.key === 'w') setTool('select-wand');
   else if (e.key === '0') { e.preventDefault(); fitCanvas(); }
   else if (e.key === '1') { e.preventDefault(); setZoom(1); }
   else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoom(1.25); }
@@ -6112,10 +6481,15 @@ document.querySelectorAll('.brush-size-btn').forEach(b => {
   b.addEventListener('click', () => setBrushSize(parseInt(b.dataset.brushSize, 10)));
 });
 function setTool(t) {
+  // M4: switching tools auto-commits any in-flight floating buffer, and
+  // leaving the selection tools clears the marquee selection.
+  if (state.selection?.floating) commitFloating();
+  if (!SELECT_TOOLS.has(t) && state.selection?.active) { clearSelection(); }
   state.tool = t;
   document.querySelectorAll('.tool[data-tool]').forEach(x => x.classList.toggle('active', x.dataset.tool === t));
   updateCursor();
   refreshBrushSizeGroup();
+  renderCanvas();
 }
 
 /* ============== Palette ============== */
