@@ -310,6 +310,65 @@
     color: var(--c-primary);
     border-color: var(--c-primary);
   }
+  /* M3 Layer panel — compact pills in the action bar.
+     One pill per layer; the eye toggles visibility, the rest of the pill
+     selects the layer. Visual states: .active = currently selected, .hidden
+     = layer.visible === false (eye dimmed + slight pill mute). */
+  .layer-grp { gap: 6px; }
+  .layer-label {
+    font-size: 11px;
+    color: var(--c-text-2);
+    margin-right: 2px;
+    user-select: none;
+  }
+  .layer-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 8px 0 6px;
+    background: transparent;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--c-text);
+    transition: background 0.12s, border-color 0.12s, color 0.12s, opacity 0.12s;
+  }
+  .layer-pill:hover { background: var(--c-toolbar-bg); border-color: var(--c-primary); }
+  .layer-pill.active {
+    background: var(--c-active-bg);
+    color: var(--c-primary);
+    border-color: var(--c-primary);
+  }
+  .layer-pill .layer-eye {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.12s, filter 0.12s;
+  }
+  .layer-pill .layer-eye:hover { background: rgba(0,0,0,0.06); }
+  .layer-pill .layer-eye svg { display: block; width: 14px; height: 14px; }
+  .layer-pill .layer-eye:not(.visible) {
+    opacity: 0.35;
+    filter: grayscale(0.8);
+  }
+  .layer-pill.hidden .layer-name {
+    text-decoration: line-through;
+    opacity: 0.55;
+  }
+  .layer-pill .layer-name { font-weight: 600; line-height: 1; }
+  @media (max-width: 768px) {
+    .layer-label { display: none; }
+    .layer-pill { padding: 0 6px 0 4px; font-size: 11px; height: 26px; }
+    .layer-pill .layer-name { font-size: 11px; }
+  }
   .ab-btn {
     width: 36px;
     height: 36px;
@@ -1992,6 +2051,18 @@
           <button class="ab-btn" id="btn-clear" data-tip="清空画布">🗑</button>
         </div>
         <div class="sep"></div>
+        <div class="grp layer-grp" id="layer-grp">
+          <span class="layer-label">层</span>
+          <button class="layer-pill active" data-layer="bg" data-tip="选中背景层" data-tip-side="bottom">
+            <span class="layer-eye visible" data-role="eye" data-tip="切换可见" data-tip-side="bottom"></span>
+            <span class="layer-name">背景</span>
+          </button>
+          <button class="layer-pill" data-layer="stamps" data-tip="选中印章层" data-tip-side="bottom">
+            <span class="layer-eye visible" data-role="eye" data-tip="切换可见" data-tip-side="bottom"></span>
+            <span class="layer-name">印章</span>
+          </button>
+        </div>
+        <div class="sep"></div>
         <div class="grp">
           <button class="ab-btn" id="btn-pbg-save" data-tip="保存工程 (.pbg)">💾</button>
           <button class="ab-btn" id="btn-pbg-load" data-tip="加载工程 (.pbg)">📂</button>
@@ -2382,7 +2453,24 @@ const state = {
   // Committed text-stamp records, kept alongside the rasterized grid so
   // .pbg can preserve them as re-editable metadata (M1).
   stamps: [],
+  // M3 (v1.41): layered model. Two layers in MVP:
+  //   bg    — every brush/fill/eraser/flip/source-remap pixel; data lives in
+  //           state.grid (single source of truth, no duplication).
+  //   stamps — virtual layer; data lives in state.stamps[]. Stamps are NOT
+  //           rasterized into state.grid anymore, so toggling stamps
+  //           visibility just skips the stamp-drawing pass.
+  // Layers metadata lives here as plain visibility/name; the underlying
+  // grid/stamps arrays remain in state.grid / state.stamps to minimize
+  // touch-points for existing logic.
+  layers: [
+    { id: 'bg',     name: '背景', visible: true },
+    { id: 'stamps', name: '印章', visible: true },
+  ],
+  activeLayerId: 'bg',  // 'bg' | 'stamps'
 };
+function getLayer(id) { return state.layers.find(l => l.id === id) || null; }
+function isLayerVisible(id) { return !!getLayer(id)?.visible; }
+function isStampsActive() { return state.activeLayerId === 'stamps'; }
 
 function makeGrid(size) {
   return Array.from({length: size}, () => Array(size).fill(null));
@@ -2402,9 +2490,16 @@ function isGridEmpty(g) {
   for (const row of g) for (const c of row) if (c) return false;
   return true;
 }
+/* M3: project is empty when bg grid AND stamps are both empty.
+   Used by canvas hint, save/export gating, draft serialization. */
+function isProjectEmpty() {
+  if (state.grid && !isGridEmpty(state.grid)) return false;
+  if (Array.isArray(state.stamps) && state.stamps.length > 0) return false;
+  return true;
+}
 function saveDraft() {
-  if (!state.grid || isGridEmpty(state.grid)) {
-    // Empty grid: clear stale draft instead of overwriting with blank.
+  if (isProjectEmpty()) {
+    // Empty project: clear stale draft instead of overwriting with blank.
     try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
     draftDirty = false;
     return;
@@ -2444,7 +2539,7 @@ function clearDraft() {
 function applyDraft(d) {
   if (d.brand && BRANDS[d.brand]) {
     state.brand = d.brand;
-    PALETTE = buildPaletteFromRaw(BRANDS[d.brand].colors);
+    PALETTE = buildPaletteFromRaw(BRANDS[d.brand].raw);
     buildColorIndex();
     document.querySelectorAll('.brand-tag').forEach(b => {
       b.classList.toggle('active', b.dataset.brand === d.brand);
@@ -2453,6 +2548,9 @@ function applyDraft(d) {
   state.size = d.size;
   state.grid = cloneGrid(d.grid);
   state.stamps = Array.isArray(d.stamps) ? d.stamps.slice() : [];
+  // M3: reset layer state on draft restore (visibility on, bg active).
+  state.layers.forEach(l => { l.visible = true; });
+  state.activeLayerId = 'bg';
   state.history = [historySnapshot()];
   state.historyIdx = 0;
   syncEditorSizeUI();
@@ -2461,6 +2559,8 @@ function applyDraft(d) {
   renderPalette();
   renderMaterials();
   refreshActionBar();
+  refreshLayerPanel?.();
+  refreshToolGating?.();
   switchView('editor');
   fitCanvas();
 }
@@ -2495,12 +2595,22 @@ function historySnapshot() {
   return {
     grid: cloneGrid(state.grid),
     stamps: cloneStamps(state.stamps),
+    // M3: layer visibility is part of editor state — undo/redo restores it.
+    // (Active selection is UI-only and stays out of the snapshot.)
+    layers: state.layers.map(l => ({ id: l.id, visible: !!l.visible })),
   };
 }
 function applyHistorySnapshot(snap) {
   if (!snap || !snap.grid) return;
   state.grid = cloneGrid(snap.grid);
   state.stamps = cloneStamps(snap.stamps);
+  if (Array.isArray(snap.layers)) {
+    snap.layers.forEach(s => {
+      const L = getLayer(s.id);
+      if (L) L.visible = !!s.visible;
+    });
+    refreshLayerPanel?.();
+  }
 }
 function pushHistory() {
   state.history = state.history.slice(0, state.historyIdx + 1);
@@ -2533,6 +2643,9 @@ function initGrid(size) {
   state.size = size;
   state.grid = makeGrid(size);
   state.stamps = [];
+  // M3: reset layer state on full init (visibility on, bg active).
+  state.layers.forEach(l => { l.visible = true; });
+  state.activeLayerId = 'bg';
   state.history = [historySnapshot()];
   state.historyIdx = 0;
   document.getElementById('m-size').textContent = `${size}×${size}`;
@@ -2540,6 +2653,8 @@ function initGrid(size) {
   renderCanvas();
   renderMaterials();
   refreshActionBar();
+  refreshLayerPanel?.();
+  refreshToolGating?.();
 }
 
 /* ============== Editor Size Selector ============== */
@@ -4458,6 +4573,13 @@ function tsRefreshColorTriggers() {
 }
 
 function tsOpenModal() {
+  // M3 guard: prevent invisible stamping when the stamps layer is hidden.
+  // Stamps land on the (hidden) stamps layer; user wouldn't see the
+  // result. PM rule: 阻断+轻提示.
+  if (!isLayerVisible('stamps')) {
+    try { showToast('印章层已隐藏，请先显示印章层再使用艺术字', 'warn'); } catch (_) {}
+    return;
+  }
   const m = document.getElementById('textstamp-modal');
   if (!m) return;
   tsBuildFontGrid();
@@ -4493,7 +4615,10 @@ function tsEndStamping(commit) {
   if (!state.stamping) return;
   if (commit) {
     const { grid: sg, w, h, anchor } = state.stamping;
-    // Record the stamp BEFORE rasterizing so .pbg keeps it re-editable.
+    // M3: stamps live exclusively in state.stamps[] now (a virtual layer).
+    // We no longer rasterize them into state.grid — that lets the stamps
+    // layer be hidden/shown without un-baking, and keeps the bg layer the
+    // single source of truth for brush/fill pixels.
     try {
       const sgCopy = sg.map(row => row.slice());
       state.stamps.push({
@@ -4507,17 +4632,7 @@ function tsEndStamping(commit) {
         strokeOn: !!(state.stamping.strokeOn ?? tsState?.strokeOn),
       });
     } catch (e) { /* non-fatal: stamps tracking is metadata only */ }
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const id = sg[y][x];
-        if (!id) continue;
-        const gx = anchor.x + x, gy = anchor.y + y;
-        if (gx >= 0 && gx < state.size && gy >= 0 && gy < state.size) {
-          state.grid[gy][gx] = id;
-        }
-      }
-    }
-    // Snapshot AFTER rasterize + stamp record so undo restores pre-stamp state
+    // Snapshot AFTER recording the stamp so undo restores pre-stamp state
     // (post-state model, consistent with fillBucket / brush stroke / flip).
     pushHistory();
     renderMaterials?.();
@@ -4771,6 +4886,77 @@ document.querySelectorAll('.tool').forEach(t => {
   });
 });
 
+/* ============== Layers panel (M3) ============== */
+/* M3 eye icons (设计师 v5 资产, Feather-style 16px). Injected by
+   refreshLayerPanel into each .layer-eye so visible/hidden states get a
+   crisp stroke icon instead of an emoji. currentColor inherits the pill
+   color (active pill = primary pink). */
+const LAYER_EYE_SVG_VISIBLE = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+const LAYER_EYE_SVG_HIDDEN = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+/* refreshLayerPanel paints the .active / .hidden classes on the layer
+   pills based on state.layers + state.activeLayerId. Called whenever
+   either changes (selection, visibility toggle, undo/redo, load, init). */
+function refreshLayerPanel() {
+  const grp = document.getElementById('layer-grp');
+  if (!grp) return;
+  grp.querySelectorAll('.layer-pill').forEach(pill => {
+    const id = pill.dataset.layer;
+    const L = getLayer(id);
+    if (!L) return;
+    pill.classList.toggle('active', state.activeLayerId === id);
+    pill.classList.toggle('hidden', !L.visible);
+    const eye = pill.querySelector('.layer-eye');
+    if (eye) {
+      eye.classList.toggle('visible', !!L.visible);
+      eye.innerHTML = L.visible ? LAYER_EYE_SVG_VISIBLE : LAYER_EYE_SVG_HIDDEN;
+      eye.setAttribute('data-tip', L.visible ? '隐藏图层' : '显示图层');
+    }
+  });
+}
+/* refreshToolGating updates paint tool buttons (brush/eraser/fill) to
+   reflect that paint is bg-only. When the stamps layer is active they
+   appear disabled (CSS opacity) so the user notices before clicking. */
+function refreshToolGating() {
+  const stamps = isStampsActive();
+  ['brush', 'eraser', 'fill'].forEach(tool => {
+    const btn = document.querySelector(`.tool[data-tool="${tool}"]`);
+    if (!btn) return;
+    btn.classList.toggle('disabled-on-stamps', stamps);
+    btn.style.opacity = stamps ? '0.45' : '';
+    btn.style.filter = stamps ? 'grayscale(0.6)' : '';
+  });
+}
+function setActiveLayer(id) {
+  if (!getLayer(id) || state.activeLayerId === id) return;
+  state.activeLayerId = id;
+  refreshLayerPanel();
+  refreshToolGating();
+}
+function toggleLayerVisibility(id) {
+  const L = getLayer(id);
+  if (!L) return;
+  L.visible = !L.visible;
+  // Visibility belongs to history: a hidden bg or hidden stamps layer is
+  // editor state we want undo to restore.
+  pushHistory();
+  refreshLayerPanel();
+  renderCanvas();
+  renderMaterials();
+}
+document.querySelectorAll('#layer-grp .layer-pill').forEach(pill => {
+  pill.addEventListener('click', (e) => {
+    const eye = e.target.closest('.layer-eye');
+    const id = pill.dataset.layer;
+    if (!id) return;
+    if (eye) {
+      e.stopPropagation();
+      toggleLayerVisibility(id);
+      return;
+    }
+    setActiveLayer(id);
+  });
+});
+
 /* Bead style picker */
 document.querySelectorAll('.bs-btn').forEach(b => {
   b.addEventListener('click', () => {
@@ -4879,15 +5065,36 @@ document.getElementById('btn-new').addEventListener('click', () => {
   if (confirm('新建会清空当前图纸，确认？')) { initGrid(state.size); clearDraft(); }
 });
 document.getElementById('btn-clear').addEventListener('click', () => {
-  if (confirm('清空当前画布？')) { state.grid = makeGrid(state.size); pushHistory(); renderCanvas(); renderMaterials(); renderPalette(); }
+  // M3: clear acts on the active layer.
+  //   bg active → wipe state.grid (preserves stamps)
+  //   stamps active → wipe state.stamps[] (preserves bg pixels)
+  if (isStampsActive()) {
+    if (!Array.isArray(state.stamps) || state.stamps.length === 0) {
+      showToast('印章层已经是空的', 'info');
+      return;
+    }
+    if (confirm('清空印章层？（背景层不动）')) {
+      state.stamps = [];
+      pushHistory();
+      renderCanvas(); renderMaterials(); renderPalette();
+    }
+    return;
+  }
+  if (confirm('清空背景层？（印章层不动）')) {
+    state.grid = makeGrid(state.size);
+    pushHistory();
+    renderCanvas(); renderMaterials(); renderPalette();
+  }
 });
 document.getElementById('btn-flip-h').addEventListener('click', () => {
   if (!state.grid) return;
-  // Horizontal flip: reverse each row in place. Pure permutation, color counts unchanged.
+  // Horizontal flip operates on the bg layer only. Stamps keep their
+  // anchors so a "flip image" doesn't accidentally stretch artwork on
+  // top of mirrored bg pixels. (M3 trade-off; can be revisited.)
   for (let y = 0; y < state.size; y++) state.grid[y].reverse();
   pushHistory();
   renderCanvas();
-  showToast('已水平镜像 ↔️');
+  showToast(state.stamps?.length ? '已水平镜像背景层（印章层未变）↔️' : '已水平镜像 ↔️');
 });
 
 /* ============== .pbg Project File (M1) ==============
@@ -4911,7 +5118,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.40';
+const PBG_APP_VERSION = '1.41';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
@@ -4970,7 +5177,10 @@ function pbgB64ToGrid(b64, size) {
   return grid;
 }
 
-/* Render a 128x128 thumbnail of the current grid (flat squares, no axis/grid). */
+/* Render a 128x128 thumbnail of the current grid (flat squares, no axis/grid).
+   M3 (PM + 设计师 拍板): thumbnail is 所见即所得 — it respects layer
+   visibility so 工作区画布 = 缩略图预览 = 导出成图 三者一致. A hidden
+   layer is excluded from the preview, matching pbgBuildExportPng. */
 function pbgBuildThumbnail(grid, size, dim = 128) {
   const off = document.createElement('canvas');
   off.width = dim;
@@ -4980,25 +5190,51 @@ function pbgBuildThumbnail(grid, size, dim = 128) {
   c.fillStyle = '#ffffff';
   c.fillRect(0, 0, dim, dim);
   const cell = dim / size;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const id = grid[y][x];
-      if (!id) continue;
-      const col = PALETTE_BY_ID[id];
-      if (!col) continue;
-      c.fillStyle = col.hex;
-      // Use ceil to avoid sub-pixel gaps between cells at non-integer cell sizes.
-      const x0 = Math.floor(x * cell);
-      const y0 = Math.floor(y * cell);
-      const x1 = Math.floor((x + 1) * cell);
-      const y1 = Math.floor((y + 1) * cell);
-      c.fillRect(x0, y0, x1 - x0, y1 - y0);
+  const bgVisible = isLayerVisible('bg');
+  const stampsVisible = isLayerVisible('stamps');
+  const paintCellFlat = (x, y, hex) => {
+    c.fillStyle = hex;
+    const x0 = Math.floor(x * cell);
+    const y0 = Math.floor(y * cell);
+    const x1 = Math.floor((x + 1) * cell);
+    const y1 = Math.floor((y + 1) * cell);
+    c.fillRect(x0, y0, x1 - x0, y1 - y0);
+  };
+  if (bgVisible) {
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const id = grid[y][x];
+        if (!id) continue;
+        const col = PALETTE_BY_ID[id];
+        if (!col) continue;
+        paintCellFlat(x, y, col.hex);
+      }
+    }
+  }
+  if (stampsVisible && Array.isArray(state.stamps)) {
+    for (const st of state.stamps) {
+      if (!st || !st.grid) continue;
+      const ax = st.anchor?.x | 0, ay = st.anchor?.y | 0;
+      for (let yy = 0; yy < st.h; yy++) {
+        for (let xx = 0; xx < st.w; xx++) {
+          const id = st.grid[yy]?.[xx];
+          if (!id) continue;
+          const gx = ax + xx, gy = ay + yy;
+          if (gx < 0 || gy < 0 || gx >= size || gy >= size) continue;
+          const col = PALETTE_BY_ID[id];
+          if (!col) continue;
+          paintCellFlat(gx, gy, col.hex);
+        }
+      }
     }
   }
   return off.toDataURL('image/png');
 }
 
-/* Render a clean 1:1 PNG of the current grid (no axis, no grid, no numbers). */
+/* Render a clean 1:1 PNG of the current grid (no axis, no grid, no numbers).
+   M3: composites bg grid + stamps overlay (respecting layer visibility).
+   stamps argument defaults to the live state stamps array; visibility is
+   read from state.layers, since this only runs on the current project. */
 function pbgBuildExportPng(grid, size, cellPx = 16) {
   const off = document.createElement('canvas');
   off.width = size * cellPx;
@@ -5007,14 +5243,36 @@ function pbgBuildExportPng(grid, size, cellPx = 16) {
   c.imageSmoothingEnabled = false;
   c.fillStyle = '#ffffff';
   c.fillRect(0, 0, off.width, off.height);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const id = grid[y][x];
-      if (!id) continue;
-      const col = PALETTE_BY_ID[id];
-      if (!col) continue;
-      c.fillStyle = col.hex;
-      c.fillRect(x * cellPx, y * cellPx, cellPx, cellPx);
+  const bgVisible = isLayerVisible('bg');
+  const stampsVisible = isLayerVisible('stamps');
+  if (bgVisible) {
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const id = grid[y][x];
+        if (!id) continue;
+        const col = PALETTE_BY_ID[id];
+        if (!col) continue;
+        c.fillStyle = col.hex;
+        c.fillRect(x * cellPx, y * cellPx, cellPx, cellPx);
+      }
+    }
+  }
+  if (stampsVisible && Array.isArray(state.stamps)) {
+    for (const st of state.stamps) {
+      if (!st || !st.grid) continue;
+      const ax = st.anchor?.x | 0, ay = st.anchor?.y | 0;
+      for (let y = 0; y < st.h; y++) {
+        for (let x = 0; x < st.w; x++) {
+          const id = st.grid[y]?.[x];
+          if (!id) continue;
+          const gx = ax + x, gy = ay + y;
+          if (gx < 0 || gy < 0 || gx >= size || gy >= size) continue;
+          const col = PALETTE_BY_ID[id];
+          if (!col) continue;
+          c.fillStyle = col.hex;
+          c.fillRect(gx * cellPx, gy * cellPx, cellPx, cellPx);
+        }
+      }
     }
   }
   return off;
@@ -5072,15 +5330,44 @@ function pbgApply(parsed) {
   // a fully-featured project file (preserves stamps + history reset).
   if (parsed.brand && BRANDS[parsed.brand]) {
     state.brand = parsed.brand;
-    PALETTE = buildPaletteFromRaw(BRANDS[parsed.brand].colors);
+    PALETTE = buildPaletteFromRaw(BRANDS[parsed.brand].raw);
     buildColorIndex();
     document.querySelectorAll('.brand-tag').forEach(b => {
       b.classList.toggle('active', b.dataset.brand === parsed.brand);
     });
   }
   state.size = parsed.size;
-  state.grid = cloneGrid(parsed.grid);
+  // M3 backwards-compat: pre-1.41 .pbg files baked stamps into pixels for
+  // visual round-trip. v1.41 keeps stamps in a virtual layer, so when a
+  // legacy file lands we un-bake those positions from the bg grid; the
+  // stamp data itself stays in parsed.stamps and renders on the stamps
+  // layer instead. New files (>=1.41) save a clean bg grid, so we trust
+  // the file as-is.
+  const fileAppVer = parseFloat(parsed.meta?.appVersion);
+  const needsUnbake = !Number.isFinite(fileAppVer) || fileAppVer < 1.41;
+  const grid = cloneGrid(parsed.grid);
+  if (needsUnbake && Array.isArray(parsed.stamps)) {
+    for (const st of parsed.stamps) {
+      if (!st || !st.grid) continue;
+      const ax = st.anchor?.x | 0, ay = st.anchor?.y | 0;
+      for (let y = 0; y < (st.h | 0); y++) {
+        for (let x = 0; x < (st.w | 0); x++) {
+          const id = st.grid[y]?.[x];
+          if (!id) continue;
+          const gx = ax + x, gy = ay + y;
+          if (gx < 0 || gy < 0 || gx >= state.size || gy >= state.size) continue;
+          // Only clear if it matches — defensive against painted overlap
+          // (won't happen in v1.39/1.40 saves, but harmless if it does).
+          if (grid[gy][gx] === id) grid[gy][gx] = null;
+        }
+      }
+    }
+  }
+  state.grid = grid;
   state.stamps = parsed.stamps.slice();
+  // M3: reset layer state on load (visibility on, bg active).
+  state.layers.forEach(l => { l.visible = true; });
+  state.activeLayerId = 'bg';
   state.history = [historySnapshot()];
   state.historyIdx = 0;
   syncEditorSizeUI();
@@ -5089,6 +5376,8 @@ function pbgApply(parsed) {
   renderPalette();
   renderMaterials();
   refreshActionBar();
+  refreshLayerPanel?.();
+  refreshToolGating?.();
   switchView('editor');
   fitCanvas();
   // After applying, persist a fresh draft so the loaded project is the baseline.
@@ -5113,7 +5402,7 @@ function pbgFilenameStamp() {
 }
 
 function pbgSaveProject() {
-  if (!state.grid || isGridEmpty(state.grid)) {
+  if (isProjectEmpty()) {
     showToast('画板是空的，没什么可保存的', 'warn');
     return;
   }
@@ -5133,7 +5422,7 @@ function pbgSaveProject() {
 }
 
 function pbgExportPng() {
-  if (!state.grid || isGridEmpty(state.grid)) {
+  if (isProjectEmpty()) {
     showToast('画板是空的，没什么可导出', 'warn');
     return;
   }
@@ -5294,8 +5583,9 @@ function drawAxisLabels(c, size, px, w, h) {
 function renderCanvas() {
   setCanvasSize();
   // Toggle the empty-canvas hint based on whether the grid has any paint.
+  // M3: empty when the bg grid AND stamps are both empty (visibility-agnostic).
   const hint = document.getElementById('canvas-empty-hint');
-  if (hint) hint.classList.toggle('hidden', !isGridEmpty(state.grid));
+  if (hint) hint.classList.toggle('hidden', !isProjectEmpty());
   const px = CELL_PX;
   const W = canvas.width, H = canvas.height;
   ctx.fillStyle = '#ffffff';
@@ -5317,22 +5607,56 @@ function renderCanvas() {
 
   const colorIndex = buildColorIndex();
   const showNum = px >= 14;
+  const bgVisible = isLayerVisible('bg');
+  const stampsVisible = isLayerVisible('stamps');
 
-  // Beads
-  for (let y = 0; y < state.size; y++) {
-    for (let x = 0; x < state.size; x++) {
-      const id = state.grid[y][x];
-      if (!id) continue;
-      const c = PALETTE_BY_ID[id];
-      if (!c) continue;
-      const cx = AXIS_PX + x * px + px/2, cy = AXIS_PX + y * px + px/2;
-      drawBead(ctx, cx, cy, px, c.hex, state.beadStyle, (y * state.size + x) * 1009 + 17);
-      if (showNum) {
-        ctx.fillStyle = textColorOn(c.hex);
-        ctx.font = `700 ${Math.max(8, Math.floor(px * 0.42))}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(colorIndex.get(id) || ''), cx, cy + 0.5);
+  // Layer 0: bg beads (state.grid)
+  if (bgVisible) {
+    for (let y = 0; y < state.size; y++) {
+      for (let x = 0; x < state.size; x++) {
+        const id = state.grid[y][x];
+        if (!id) continue;
+        const c = PALETTE_BY_ID[id];
+        if (!c) continue;
+        const cx = AXIS_PX + x * px + px/2, cy = AXIS_PX + y * px + px/2;
+        drawBead(ctx, cx, cy, px, c.hex, state.beadStyle, (y * state.size + x) * 1009 + 17);
+        if (showNum) {
+          ctx.fillStyle = textColorOn(c.hex);
+          ctx.font = `700 ${Math.max(8, Math.floor(px * 0.42))}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(colorIndex.get(id) || ''), cx, cy + 0.5);
+        }
+      }
+    }
+  }
+  // Layer 1: stamps overlay (state.stamps[]) — drawn ON TOP of bg, so a
+  // visible stamp will hide bg beads beneath it. Hidden stamps layer = no
+  // stamp pixels at all (data preserved). Stamp cells reuse the bead
+  // renderer + the same color index, so a stamp pixel is visually
+  // identical to a bg bead of the same id.
+  if (stampsVisible && Array.isArray(state.stamps) && state.stamps.length) {
+    for (const st of state.stamps) {
+      if (!st || !st.grid) continue;
+      const ax = st.anchor?.x | 0, ay = st.anchor?.y | 0;
+      for (let y = 0; y < st.h; y++) {
+        for (let x = 0; x < st.w; x++) {
+          const id = st.grid[y]?.[x];
+          if (!id) continue;
+          const gx = ax + x, gy = ay + y;
+          if (gx < 0 || gy < 0 || gx >= state.size || gy >= state.size) continue;
+          const c = PALETTE_BY_ID[id];
+          if (!c) continue;
+          const cx = AXIS_PX + gx * px + px/2, cy = AXIS_PX + gy * px + px/2;
+          drawBead(ctx, cx, cy, px, c.hex, state.beadStyle, (gy * state.size + gx) * 1009 + 17);
+          if (showNum) {
+            ctx.fillStyle = textColorOn(c.hex);
+            ctx.font = `700 ${Math.max(8, Math.floor(px * 0.42))}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(colorIndex.get(id) || ''), cx, cy + 0.5);
+          }
+        }
       }
     }
   }
@@ -5584,7 +5908,33 @@ function pointerToCell(e) {
   return [x, y];
 }
 
+/* M3 layer guard: brush / eraser / fill / picker only operate on the bg
+   layer. Two cases trigger a block + toast (PM rule: 阻断+轻提示):
+     a) the stamps layer is active (it has no editable bg-grid)
+     b) the active layer itself is hidden (paint would land invisibly)
+   Returns true if the action should proceed, false if blocked. */
+let _paintBlockToastTs = 0;
+function paintAllowedOrHint() {
+  const now = Date.now();
+  const fire = (msg) => {
+    if (now - _paintBlockToastTs > 1500) {
+      _paintBlockToastTs = now;
+      try { showToast(msg, 'warn'); } catch (_) {}
+    }
+  };
+  if (isStampsActive()) {
+    fire('印章层不能画笔，请选中“背景”层');
+    return false;
+  }
+  if (!isLayerVisible(state.activeLayerId)) {
+    fire('当前图层已隐藏，请先显示图层再操作');
+    return false;
+  }
+  return true;
+}
+
 function paintCell(cx, cy) {
+  if (!paintAllowedOrHint()) return false;
   const id = state.tool === 'eraser' ? null : state.selectedColorId;
   const n = (state.tool === 'brush' || state.tool === 'eraser') ? state.brushSize : 1;
   // Brush block: NxN top-left aligned at cursor cell. For n=1 this is a single cell.
@@ -5604,6 +5954,7 @@ function paintCell(cx, cy) {
 }
 
 function fillBucket(x, y) {
+  if (!paintAllowedOrHint()) return false;
   const target = state.grid[y][x];
   const replace = state.selectedColorId;
   if (target === replace) return false;
@@ -5873,11 +6224,29 @@ function renderPalette() {
 /* ============== Materials ============== */
 function tallyColors() {
   const counts = new Map();
+  // Layer 0: bg grid
   for (let y = 0; y < state.size; y++) {
     for (let x = 0; x < state.size; x++) {
       const id = state.grid[y][x];
       if (!id) continue;
       counts.set(id, (counts.get(id) || 0) + 1);
+    }
+  }
+  // Layer 1: stamps virtual layer (M3). Tally regardless of visibility, so
+  // material counts reflect the actual project data, not the current view.
+  if (Array.isArray(state.stamps)) {
+    for (const st of state.stamps) {
+      if (!st || !st.grid) continue;
+      const ax = st.anchor?.x | 0, ay = st.anchor?.y | 0;
+      for (let y = 0; y < st.h; y++) {
+        for (let x = 0; x < st.w; x++) {
+          const id = st.grid[y]?.[x];
+          if (!id) continue;
+          const gx = ax + x, gy = ay + y;
+          if (gx < 0 || gy < 0 || gx >= state.size || gy >= state.size) continue;
+          counts.set(id, (counts.get(id) || 0) + 1);
+        }
+      }
     }
   }
   return [...counts.entries()].map(([id, n]) => ({ ...PALETTE_BY_ID[id], count: n }))
