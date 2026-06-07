@@ -3167,23 +3167,30 @@ function floodFillWhiteEdgesToAlpha(img) {
 
 function generateHiresPair(img, size, scale = 4, blurPx = 1.5) {
   const w = size * scale;
-  const s = Math.min(img.width, img.height);
-  const sx = (img.width - s) / 2, sy = (img.height - s) / 2;
+  // CONTAIN fit (v1.44): scale the WHOLE image to fit inside the square board,
+  // letterboxing the short edge with transparent pixels instead of cropping the
+  // long edge (cover). Transparent margins become empty cells downstream because
+  // edgeAwareDownsampleRGB is alpha-aware (avg alpha < 64 → skipped, no bead).
+  const r = Math.min(w / img.width, w / img.height);
+  const dw = img.width * r, dh = img.height * r;
+  const dx = (w - dw) / 2, dy = (w - dh) / 2;
 
   const co = document.createElement('canvas');
   co.width = w; co.height = w;
   const ctxo = co.getContext('2d', { willReadFrequently: true });
   ctxo.imageSmoothingEnabled = true;
   ctxo.imageSmoothingQuality = 'high';
-  ctxo.drawImage(img, sx, sy, s, s, 0, 0, w, w);
+  ctxo.clearRect(0, 0, w, w);
+  ctxo.drawImage(img, 0, 0, img.width, img.height, dx, dy, dw, dh);
 
   const cb = document.createElement('canvas');
   cb.width = w; cb.height = w;
   const ctxb = cb.getContext('2d', { willReadFrequently: true });
   ctxb.imageSmoothingEnabled = true;
   ctxb.imageSmoothingQuality = 'high';
+  ctxb.clearRect(0, 0, w, w);
   ctxb.filter = `blur(${blurPx}px)`;
-  ctxb.drawImage(img, sx, sy, s, s, 0, 0, w, w);
+  ctxb.drawImage(img, 0, 0, img.width, img.height, dx, dy, dw, dh);
   ctxb.filter = 'none';
 
   return { orig: ctxo.getImageData(0, 0, w, w).data, blurred: ctxb.getImageData(0, 0, w, w).data, w };
@@ -3669,9 +3676,13 @@ function estimateComplexity(img) {
   const off = document.createElement('canvas');
   off.width = N; off.height = N;
   const ctx = off.getContext('2d', { willReadFrequently: true });
-  const s = Math.min(img.width, img.height);
-  const sx = (img.width - s) / 2, sy = (img.height - s) / 2;
-  ctx.drawImage(img, sx, sy, s, s, 0, 0, N, N);
+  // CONTAIN fit (v1.44), consistent with generateHiresPair: whole image fits
+  // inside the sample square; short edge letterboxed (transparent) not cropped.
+  const r = Math.min(N / img.width, N / img.height);
+  const dw = img.width * r, dh = img.height * r;
+  const dx = (N - dw) / 2, dy = (N - dh) / 2;
+  ctx.clearRect(0, 0, N, N);
+  ctx.drawImage(img, 0, 0, img.width, img.height, dx, dy, dw, dh);
   const data = ctx.getImageData(0, 0, N, N).data;
   let sum = 0, n = 0;
   for (let y = 1; y < N - 1; y++) {
@@ -5341,7 +5352,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.43';
+const PBG_APP_VERSION = '1.44';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
