@@ -1203,15 +1203,7 @@
     background: white;
   }
   .a4 h3 { font-size: 14px; margin: 16px 0 8px; padding-left: 8px; border-left: 4px solid var(--c-secondary); color: #1f2937; }
-  .a4 table { width: 100%; border-colckground: rgba(255, 200, 87, 0.18);
-    border: 1px solid rgba(255, 200, 87, 0.5);
-    border-radius: var(--r-sm);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 12px;
-  }
+  .a4 table { width: 100%; border-collapse: collapse; font-size: 12px; }
   .merge-bar .merge-msg { color: #92400e; line-height: 1.35; }
   .merge-bar .merge-btn {
     flex-shrink: 0;
@@ -5382,7 +5374,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.45';
+const PBG_APP_VERSION = '1.46';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
