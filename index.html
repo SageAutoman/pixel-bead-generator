@@ -1139,7 +1139,7 @@
   .empty-hint { font-size: 12px; color: var(--c-text-3); text-align: center; padding: 16px 0; }
 
   /* Export */
-  #v-export { background: #e5e7eb; padding: 24px; overflow: auto; flex-direction: column; align-items: center; }
+  #v-export { background: #e5e7eb; padding: 0 24px 24px; overflow: auto; flex-direction: column; align-items: center; }
   @media (prefers-color-scheme: dark) {
     #v-export { background: #0a0c10; }
   }
@@ -1154,6 +1154,35 @@
     margin: 0 auto 24px;
   }
   #export-pages { display: flex; flex-direction: column; align-items: center; }
+  .print-bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    align-self: stretch;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    margin: 0 0 20px;
+    background: var(--c-paper);
+    border-bottom: 1px solid var(--c-border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .print-bar-back {
+    background: var(--c-toolbar-bg);
+    color: var(--c-text-2);
+    border: 1px solid var(--c-border);
+    padding: 8px 16px;
+    border-radius: 100px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .print-bar-back:hover { color: var(--c-secondary); }
+  .print-bar-back:active { transform: scale(0.96); }
   .a4 .head {
     border-bottom: 2px solid #1f2937;
     padding-bottom: 12px;
@@ -1200,7 +1229,7 @@
   .empty-hint { font-size: 12px; color: var(--c-text-3); text-align: center; padding: 16px 0; }
 
   /* Export */
-  #v-export { background: #e5e7eb; padding: 24px; overflow: auto; flex-direction: column; align-items: center; }
+  #v-export { background: #e5e7eb; padding: 0 24px 24px; overflow: auto; flex-direction: column; align-items: center; }
   @media (prefers-color-scheme: dark) {
     #v-export { background: #0a0c10; }
   }
@@ -1944,7 +1973,7 @@
 
     .drawer-backdrop { display: block; }
 
-    #v-export { padding: 12px; }
+    #v-export { padding: 0 12px 12px; }
     .a4 { padding: 20px; }
   }
 </style>
@@ -1958,7 +1987,6 @@
       <button class="tab" data-view="editor">2. 工作区</button>
       <button class="tab" data-view="export">3. 打印</button>
     </div>
-    <button class="btn-primary" id="btn-go-export">导出图纸</button>
   </header>
 
   <!-- Landing -->
@@ -2172,10 +2200,13 @@
 
   <!-- Export -->
   <section id="v-export" class="view">
+    <div class="print-bar no-print">
+      <button class="print-bar-back" onclick="switchView('editor')">← 返回工作区</button>
+      <button class="btn-primary" onclick="window.print()">🖨️ 打印 / 另存为 PDF</button>
+    </div>
     <div id="export-pages"></div>
     <div style="margin: 16px auto 32px; text-align:center" class="no-print">
-      <button class="btn-primary" onclick="window.print()">🖨️ 打印 / 另存为 PDF</button>
-      <div style="font-size:11px;color:var(--c-text-3);margin-top:6px">大图自动分页 · A4 纵向 · 推荐保留默认页边距</div>
+      <div style="font-size:11px;color:var(--c-text-3)">大图自动分页 · A4 纵向 · 推荐保留默认页边距</div>
     </div>
   </section>
 </div>
@@ -2771,7 +2802,6 @@ function switchView(name) {
   if (name === 'editor') requestAnimationFrame(() => { fitCanvas(); renderCanvas(); });
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchView(t.dataset.view)));
-document.getElementById('btn-go-export').addEventListener('click', () => switchView('export'));
 
 /* ============== Landing Actions ============== */
 let landingSize = 52;
@@ -5352,7 +5382,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.44';
+const PBG_APP_VERSION = '1.45';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
