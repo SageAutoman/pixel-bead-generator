@@ -1292,6 +1292,13 @@
   /* Print: only the A4 export view, single-page friendly, compact legend */
   @media print {
     @page { size: A4; margin: 10mm; }
+    /* Keep on-screen colors (bead swatch chips, header tints, canvas) in the
+       printed PDF — browsers strip background colors by default, which made
+       the legend chips print colorless and look nothing like the page. */
+    html, body, .a4, .a4 * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
     html, body {
       background: white !important;
       margin: 0 !important;
@@ -1313,10 +1320,12 @@
     }
     .a4 + .a4 { page-break-before: always; }
     .a4 .pattern-wrap canvas { max-width: 100%; max-height: 235mm; width: auto !important; height: auto !important; border: 1px solid #1f2937 !important; object-fit: contain; }
+    /* Match the on-screen legend layout (3 columns, same font) so the printed
+       PDF looks like the export page instead of a denser reflow. */
     .export-legend {
-      grid-template-columns: repeat(4, 1fr);
-      font-size: 10px;
-      gap: 2px 10px;
+      grid-template-columns: repeat(3, 1fr);
+      font-size: 11.5px;
+      gap: 4px 14px;
       page-break-inside: auto;
     }
     .export-legend .leg-item { page-break-inside: avoid; }
@@ -5374,7 +5383,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.46';
+const PBG_APP_VERSION = '1.47';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
