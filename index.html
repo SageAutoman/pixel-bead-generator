@@ -1984,10 +1984,9 @@
         <span class="ai-switch"></span>
       </label>
       <div class="size-row">
-        <button class="size-btn" data-size="29"><span class="n">29²</span><span class="lbl">~7.5cm</span></button>
-        <button class="size-btn active" data-size="38"><span class="n">38²</span><span class="lbl">~10cm</span></button>
-        <button class="size-btn" data-size="48"><span class="n">48²</span><span class="lbl">~12.5cm</span></button>
-        <button class="size-btn" data-size="58"><span class="n">58²</span><span class="lbl">~15cm</span></button>
+        <button class="size-btn active" data-size="52"><span class="n">52²</span><span class="lbl">~13.5cm</span></button>
+        <button class="size-btn" data-size="78"><span class="n">78²</span><span class="lbl">~20cm</span></button>
+        <button class="size-btn" data-size="104"><span class="n">104²</span><span class="lbl">~27cm</span></button>
       </div>
       <button class="start-btn" id="btn-blank">🎨 创建空白画布</button>
       <div class="draft-banner" id="draft-banner" hidden>
@@ -2081,7 +2080,7 @@
         </div>
         <button class="ab-btn mobile-only" id="btn-show-panel" data-tip="调色板" style="margin-left:auto">🎨</button>
         <div class="ab-meta">
-          <span>尺寸 <span class="v" id="m-size">29×29</span></span>
+          <span>尺寸 <span class="v" id="m-size">52×52</span></span>
           <span>色板 <span class="v" id="m-brand">MARD</span></span>
         </div>
       </div>
@@ -2128,10 +2127,9 @@
         <div class="sb-title sb-toggle"><span><span class="sb-caret">▼</span>📐 画板大小</span><span id="size-source-hint" style="color:var(--c-text-3);font-weight:500;font-size:10px"></span></div>
         <div class="sb-body">
           <div class="size-row" id="editor-size-row">
-            <button class="size-btn" data-size="29"><span class="n">29²</span><span class="lbl">~7.5cm</span></button>
-            <button class="size-btn active" data-size="38"><span class="n">38²</span><span class="lbl">~10cm</span></button>
-            <button class="size-btn" data-size="48"><span class="n">48²</span><span class="lbl">~12.5cm</span></button>
-            <button class="size-btn" data-size="58"><span class="n">58²</span><span class="lbl">~15cm</span></button>
+            <button class="size-btn active" data-size="52"><span class="n">52²</span><span class="lbl">~13.5cm</span></button>
+            <button class="size-btn" data-size="78"><span class="n">78²</span><span class="lbl">~20cm</span></button>
+            <button class="size-btn" data-size="104"><span class="n">104²</span><span class="lbl">~27cm</span></button>
           </div>
         </div>
       </div>
@@ -2448,7 +2446,7 @@ function currentBeadLabel() {
   return `${mm}mm 大豆`;
 }
 const state = {
-  size: 29,
+  size: 52,
   grid: null,            // 2D array [size][size] of color id or null
   beadStyle: 'solid',    // 'solid' | 'hollow' | 'fineGlitter' | 'coarseGlitter' | 'fluffy'
   selectedColorId: 'MARD-E5',  // start with a pink
@@ -2776,7 +2774,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 document.getElementById('btn-go-export').addEventListener('click', () => switchView('export'));
 
 /* ============== Landing Actions ============== */
-let landingSize = 38;
+let landingSize = 52;
 
 /* Lightweight transient toast (top-center, auto-dismiss). */
 function showToast(msg, kind) {
@@ -3691,8 +3689,8 @@ function estimateComplexity(img) {
 }
 
 function suggestUpSize(complexity, currentSize) {
-  if (complexity <= 40 || currentSize >= 58) return null;
-  const sizes = [29, 38, 48, 58];
+  if (complexity <= 40 || currentSize >= 104) return null;
+  const sizes = [52, 78, 104];
   const idx = sizes.indexOf(currentSize);
   return idx >= 0 && idx < sizes.length - 1 ? sizes[idx + 1] : null;
 }
@@ -3710,7 +3708,7 @@ function countBeads(grid) {
 
 /* Compare Modal */
 let pendingImg = null;
-let pendingSize = 29;
+let pendingSize = 52;
 let pendingResults = null;
 let pendingAiRemove = true;
 let pendingMaxColors = 16;  // default cap; user-selectable in compare modal
@@ -3866,7 +3864,7 @@ function renderSizeOptions(currentSize) {
   const wrap = document.getElementById('suggestion-size-options');
   if (!wrap) return;
   wrap.innerHTML = '';
-  [29, 38, 48, 58].forEach(sz => {
+  [52, 78, 104].forEach(sz => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'suggestion-mini' + (sz === currentSize ? ' active' : '');
@@ -5328,7 +5326,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
      v: 1,
      palette: "MARD-291-v1",       // locked palette identifier
      brand: "MARD",
-     size: 29,
+     size: 52,
      pixels: "<base64 of uint16 LE, length = size*size>",
                                    // 0 = empty, n>0 = palette index + 1
      stamps: [{ grid, w, h, anchor:{x,y}, ts, text?, fontId?, mainColorId?, strokeOn? }, ...],
@@ -5343,7 +5341,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.42';
+const PBG_APP_VERSION = '1.43';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
@@ -6967,7 +6965,7 @@ function pinchDistance() {
 }
 
 /* ============== Boot ============== */
-initGrid(38);
+initGrid(52);
 renderPalette();
 updateCursor();
 refreshBrushSizeGroup();
