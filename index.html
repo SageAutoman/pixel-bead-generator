@@ -1303,12 +1303,36 @@
       background: white !important;
       margin: 0 !important;
       padding: 0 !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+    /* The app is a 100vh flex column and #v-export is an overflow:auto scroll
+       box. In print that scroll viewport gets captured at the current scroll
+       position — so anything scrolled out of view (title, top axis, top rows)
+       is clipped and an ugly scrollbar appears. Release the whole chain to
+       natural height with visible overflow so the full document flows into the
+       printed pages regardless of on-screen scroll. */
+    .app {
+      display: block !important;
+      height: auto !important;
+      min-height: 0 !important;
+      overflow: visible !important;
     }
     .top-bar, .toolbar, .sidebar, .tabs, .modal-backdrop, .drawer-backdrop,
     .outline-pop, .upload-area, .landing, #upload-input, .toolbar-mobile,
     .no-print, .ant-message, .resize-handle { display: none !important; }
     .view { display: none !important; }
-    #v-export.view, #v-export { display: block !important; position: static !important; padding: 0 !important; background: white !important; }
+    #v-export.view, #v-export {
+      display: block !important;
+      position: static !important;
+      flex: none !important;
+      height: auto !important;
+      max-height: none !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+      padding: 0 !important;
+      background: white !important;
+    }
     /* #export-pages is display:flex (column) on screen. Flex items IGNORE
        page-break/break-before in print, so the legend never moved to its own
        page and got clipped at the bottom of page 1. Force block layout in
@@ -5388,7 +5412,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.49';
+const PBG_APP_VERSION = '1.50';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
