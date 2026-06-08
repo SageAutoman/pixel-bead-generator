@@ -1309,6 +1309,11 @@
     .no-print, .ant-message, .resize-handle { display: none !important; }
     .view { display: none !important; }
     #v-export.view, #v-export { display: block !important; position: static !important; padding: 0 !important; background: white !important; }
+    /* #export-pages is display:flex (column) on screen. Flex items IGNORE
+       page-break/break-before in print, so the legend never moved to its own
+       page and got clipped at the bottom of page 1. Force block layout in
+       print so page breaks actually apply. */
+    #export-pages { display: block !important; }
     .a4 {
       box-shadow: none !important;
       max-width: 100% !important;
@@ -1316,9 +1321,11 @@
       padding: 0 !important;
       margin: 0 !important;
       border-radius: 0 !important;
-      page-break-inside: avoid;
     }
-    .a4 + .a4 { page-break-before: always; }
+    /* Pattern page stays whole; legend may span multiple pages (break between
+       items, never mid-item) so long color lists are not clipped. */
+    .a4-pattern { page-break-inside: avoid; break-inside: avoid; }
+    .a4 + .a4 { page-break-before: always; break-before: page; }
     .a4 .pattern-wrap canvas { max-width: 100%; max-height: 235mm; width: auto !important; height: auto !important; border: 1px solid #1f2937 !important; object-fit: contain; }
     /* Match the on-screen legend layout (3 columns, same font) so the printed
        PDF looks like the export page instead of a denser reflow. */
@@ -5381,7 +5388,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.48';
+const PBG_APP_VERSION = '1.49';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
