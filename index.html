@@ -3566,7 +3566,7 @@ async function ensureImgly(onProgress) {
   if (imglyLib) return imglyLib;
   if (imglyLoading) return imglyLoading;
   imglyLoading = (async () => {
-    if (onProgress) onProgress('script', 0);
+    if (onProgress) onProgress('script', 0, 0);
     let lastErr = null;
     for (const url of IMGLY_CDN_URLS) {
       try {
@@ -3605,7 +3605,7 @@ async function mlRemoveBackground(srcImg, onProgress) {
     model: 'small',
     output: { format: 'image/png', quality: 0.9 },
     progress: (key, current, total) => {
-      if (onProgress) onProgress(key, total > 0 ? current / total : 0);
+      if (onProgress) onProgress(key, current, total);
     },
   });
   // Decode the blob back to an HTMLImageElement so the rest of the pipeline
@@ -4025,21 +4025,37 @@ async function runComparison(runId = compareRunId) {
         return null;
       };
       let lastKey = '';
-      const masked = await mlRemoveBackground(pendingImg, (key, ratio) => {
+      // Track real download bytes per fetch key so we can show a TRUE aggregate
+      // download %. imgly fires one progress key per file; summing current/total
+      // across all keys that report a content-length gives honest overall
+      // progress. Keys without content-length (total=0) fall back to indeterminate.
+      const fetchBytes = new Map();
+      const masked = await mlRemoveBackground(pendingImg, (key, current, total) => {
         if (key !== lastKey) {
           lastKey = key;
           phaseLabel(key);
         }
-        // imgly's per-file ratios reset/jump per key (and total is often 0), so a
-        // numeric % is misleading. Show an honest indeterminate sweep during model
-        // load; only the matting phase maps to a single coherent fill.
-        const isModelPhase = (key === 'script' || key.startsWith('fetch'));
+        const isModelPhase = (key === 'script' || key.startsWith('fetch') || key.startsWith('download'));
         if (isModelPhase) {
-          if (progressFill) { progressFill.classList.add('indeterminate'); progressFill.style.width = ''; }
-          if (progressText) progressText.textContent = isModelCached() ? '正在载入…' : '正在下载…';
+          if (key.startsWith('fetch') || key.startsWith('download')) {
+            fetchBytes.set(key, { current: current || 0, total: total || 0 });
+          }
+          let aggCur = 0, aggTot = 0;
+          for (const v of fetchBytes.values()) { if (v.total > 0) { aggCur += v.current; aggTot += v.total; } }
+          if (aggTot > 0) {
+            const pct = Math.max(0, Math.min(100, (aggCur / aggTot) * 100)).toFixed(0);
+            if (progressFill) { progressFill.classList.remove('indeterminate'); progressFill.style.width = pct + '%'; }
+            if (progressText) progressText.textContent = (isModelCached() ? '载入 ' : '下载 ') + pct + '%';
+          } else {
+            // No content-length reported yet → honest indeterminate sweep.
+            if (progressFill) { progressFill.classList.add('indeterminate'); progressFill.style.width = ''; }
+            if (progressText) progressText.textContent = isModelCached() ? '正在载入…' : '正在下载…';
+          }
         } else {
+          // Matting / compute phase: single coherent step.
           if (progressFill) {
             progressFill.classList.remove('indeterminate');
+            const ratio = total > 0 ? current / total : current;
             const pct = (Math.max(0, Math.min(1, ratio)) * 100).toFixed(0);
             progressFill.style.width = pct + '%';
             if (progressText) progressText.textContent = pct + '%';
@@ -5437,7 +5453,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.51';
+const PBG_APP_VERSION = '1.52';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
