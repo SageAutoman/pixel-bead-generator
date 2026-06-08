@@ -1830,6 +1830,17 @@
     background: var(--c-primary);
     transition: width 0.2s ease-out;
   }
+  /* imgly reports unreliable per-file progress, so during model load we show an
+     honest indeterminate sweep instead of a fake percentage. */
+  .compare-progress-fill.indeterminate {
+    width: 40%;
+    transition: none;
+    animation: cp-indeterminate 1.1s ease-in-out infinite;
+  }
+  @keyframes cp-indeterminate {
+    0%   { transform: translateX(-110%); }
+    100% { transform: translateX(260%); }
+  }
   .compare-progress-text {
     font-size: 11px;
     color: var(--c-text-3);
@@ -3797,7 +3808,8 @@ function setCompareStage(stage, detail) {
   const map = {
     'image:loading': ['准备生成中...', '正在读取图片并准备处理', '正在读取图片...'],
     preparing: ['准备生成中...', '正在读取图片并准备处理', '正在读取图片...'],
-    'model:downloading': ['正在下载 AI 模型...', '首次使用需下载模型，之后会自动缓存', '正在下载 AI 模型...'],
+    'model:downloading': ['正在下载 AI 模型...', '首次使用需下载模型（约 40MB），之后会自动缓存', '正在下载 AI 模型...'],
+    'model:loading': ['正在载入 AI 模型...', '模型已缓存，正在从本地载入', '正在载入 AI 模型...'],
     'ai:matting': ['AI 抠图处理中...', '正在识别主体并移除背景', 'AI 抠图处理中...'],
     'pixel:generating': ['正在生成拼豆方案...', '正在分析颜色并生成图纸', '正在生成拼豆方案...'],
     done: ['生成完成，请选择风格', '已生成两种拼豆图纸方案', ''],
@@ -4001,13 +4013,14 @@ async function runComparison(runId = compareRunId) {
   let bgAlreadyRemoved = false;
 
   if (useML) {
-    setCompareStage(isModelCached() ? 'ai:matting' : 'model:downloading');
+    const cachedAtStart = isModelCached();
+    setCompareStage(cachedAtStart ? 'model:loading' : 'model:downloading');
     if (progressWrap) progressWrap.hidden = false;
-    if (progressFill) progressFill.style.width = '0%';
-    if (progressText) progressText.textContent = '0%';
+    if (progressFill) { progressFill.classList.add('indeterminate'); progressFill.style.width = ''; }
+    if (progressText) progressText.textContent = cachedAtStart ? '正在载入…' : '正在下载…';
     try {
       const phaseLabel = (key) => {
-        if (key === 'script' || key.startsWith('fetch')) setCompareStage('model:downloading');
+        if (key === 'script' || key.startsWith('fetch')) setCompareStage(isModelCached() ? 'model:loading' : 'model:downloading');
         else setCompareStage('ai:matting');
         return null;
       };
@@ -4017,14 +4030,26 @@ async function runComparison(runId = compareRunId) {
           lastKey = key;
           phaseLabel(key);
         }
-        const pct = (Math.max(0, Math.min(1, ratio)) * 100).toFixed(0);
-        if (progressFill) progressFill.style.width = pct + '%';
-        if (progressText) progressText.textContent = pct + '%';
+        // imgly's per-file ratios reset/jump per key (and total is often 0), so a
+        // numeric % is misleading. Show an honest indeterminate sweep during model
+        // load; only the matting phase maps to a single coherent fill.
+        const isModelPhase = (key === 'script' || key.startsWith('fetch'));
+        if (isModelPhase) {
+          if (progressFill) { progressFill.classList.add('indeterminate'); progressFill.style.width = ''; }
+          if (progressText) progressText.textContent = isModelCached() ? '正在载入…' : '正在下载…';
+        } else {
+          if (progressFill) {
+            progressFill.classList.remove('indeterminate');
+            const pct = (Math.max(0, Math.min(1, ratio)) * 100).toFixed(0);
+            progressFill.style.width = pct + '%';
+            if (progressText) progressText.textContent = pct + '%';
+          }
+        }
       });
       workImg = masked;
       bgAlreadyRemoved = true;
       markModelCached();
-      if (progressFill) progressFill.style.width = '100%';
+      if (progressFill) { progressFill.classList.remove('indeterminate'); progressFill.style.width = '100%'; }
       if (progressText) progressText.textContent = '100%';
     } catch (err) {
       console.warn('ML bg removal failed, falling back to heuristic', err);
@@ -5412,7 +5437,7 @@ document.getElementById('btn-flip-h').addEventListener('click', () => {
 */
 const PBG_VERSION = 1;
 const PBG_PALETTE_ID = 'MARD-291-v1';
-const PBG_APP_VERSION = '1.50';
+const PBG_APP_VERSION = '1.51';
 // Lock palette index to MARD_RAW order. Stable as long as MARD_RAW is unchanged.
 const PBG_PALETTE_INDEX = (() => {
   const m = new Map();
